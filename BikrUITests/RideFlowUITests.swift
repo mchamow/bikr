@@ -84,15 +84,23 @@ final class RideFlowUITests: XCTestCase {
         }
     }
 
+    /// Answers the location permission prompt on a simulator that hasn't been
+    /// asked yet. The simulator's language is whatever the machine runs in, so
+    /// this can't rely on English button labels.
     @MainActor
     private func allowLocationAccessIfAsked() {
         let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
-        for label in ["Allow While Using App", "Allow Once"] {
-            let button = springboard.buttons[label]
-            if button.waitForExistence(timeout: 3) {
-                button.tap()
-                return
-            }
+        let prompt = springboard.alerts.firstMatch
+        guard prompt.waitForExistence(timeout: 15) else {
+            print("No location prompt appeared; this simulator has been asked already.")
+            return
         }
+
+        let buttons = prompt.buttons.allElementsBoundByIndex
+        print("Location prompt: \(buttons.map(\.label))")
+        // Fall back to the first button: the two "allow" choices come before
+        // "don't allow", whatever language the simulator runs in.
+        let allow = buttons.first { ["Allow While Using App", "Allow Once"].contains($0.label) } ?? buttons.first
+        allow?.tap()
     }
 }

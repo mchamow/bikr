@@ -1,5 +1,7 @@
 # Bikr
 
+[![CI](https://github.com/mchamow/bikr/actions/workflows/ci.yml/badge.svg)](https://github.com/mchamow/bikr/actions/workflows/ci.yml)
+
 A super simple bike ride recorder and track follower for iPhone (iOS 26+).
 
 - **Record rides**: start, pause, resume, finish. Keeps recording with the screen locked.
@@ -52,4 +54,8 @@ xcrun simctl openurl booted "file://$PWD/Samples/vistula-loop.gpx"
 ```
 
 `scripts/ui-test.sh` makes the simulator ride a route through Kraków while the test runs,
-so the recorded ride has real distance in it.
+so the recorded ride has real distance in it. Without a device name it picks the newest
+iPhone simulator it can find.
+
+Both run on every push and pull request via GitHub Actions (`.github/workflows/ci.yml`),
+on a `macos-26` runner — free for public repositories.

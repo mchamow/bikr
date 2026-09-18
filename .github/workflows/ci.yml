@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same branch makes an in-flight run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit-tests:
+    name: Unit tests
+    # Apple silicon, with Xcode 26 and iOS 26 simulators. Free for public repos.
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Show toolchain
+        run: xcodebuild -version
+      - name: Test BikrCore
+        run: ./scripts/test-core.sh
+
+  ui-test:
+    name: Build and UI test
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v7
+      - name: Build the app
+        run: |
+          xcodebuild build -project Bikr.xcodeproj -scheme Bikr \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build/DerivedData -quiet
+      - name: Record a ride and follow it
+        run: ./scripts/ui-test.sh "" -derivedDataPath build/DerivedData -resultBundlePath build/ui-test.xcresult
+      - name: Keep the test results when something fails
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ui-test-results
+          path: build/ui-test.xcresult
+          retention-days: 7
