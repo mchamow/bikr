@@ -121,6 +121,16 @@ final class RideFlowUITests: XCTestCase {
 
         recordUntilMoving(app)
 
+        // The drawn map behaves like a map: dragging it stops it following the
+        // rider, and a button brings them back to the middle.
+        XCTAssertTrue(app.buttons["Show the Whole Track"].exists, "No way to see the whole track")
+        XCTAssertFalse(app.buttons["Centre on Me"].exists, "Already off-centre before anything was dragged")
+        app.swipeLeft()
+        let centreOnMe = app.buttons["Centre on Me"]
+        XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5), "Dragging the map didn't free it from the rider")
+        centreOnMe.tap()
+        XCTAssertFalse(centreOnMe.waitForExistence(timeout: 3), "Still off-centre after centring")
+
         app.buttons["Finish"].tap()
         app.buttons["Discard Ride"].tap()
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 5))

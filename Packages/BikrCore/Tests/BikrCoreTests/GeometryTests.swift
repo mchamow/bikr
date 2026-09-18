@@ -26,6 +26,13 @@ struct GeometryTests {
         #expect(abs(offset.north + 150) < 0.5)
     }
 
+    @Test func movingAndMeasuringAreInverses() {
+        let there = home.moved(east: -250, north: 400)
+        let offset = home.offset(to: there)
+        #expect(abs(offset.east + 250) < 0.5)
+        #expect(abs(offset.north - 400) < 0.5)
+    }
+
     @Test func offsetOfThePointItself() {
         let offset = home.offset(to: home)
         #expect(offset.east == 0)

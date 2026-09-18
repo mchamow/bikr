@@ -9,8 +9,6 @@ struct RideScreen: View {
     @Environment(AppModel.self) private var model
     @AppStorage("showsAppleMap") private var showsAppleMap = true
     @State private var camera = MapCameraPosition.userLocation(fallback: .automatic)
-    @State private var metersAcross = 800.0
-    @State private var metersAcrossAtPinchStart: Double?
     @State private var isPickingTrack = false
     @State private var isConfirmingFinish = false
 
@@ -95,23 +93,19 @@ struct RideScreen: View {
     }
 
     private var drawnMap: some View {
-        TrackCanvas(lines: canvasLines, focus: canvasFocus, rider: canvasRider, wayBack: canvasWayBack)
-            .overlay {
-                if canvasRider == nil && canvasLines.allSatisfy({ $0.segments.allSatisfy(\.isEmpty) }) {
-                    ContentUnavailableView("Waiting for GPS…", systemImage: "location.magnifyingglass",
-                                           description: Text("Your position and track appear here, with or without a connection."))
-                }
+        InteractiveTrackCanvas(
+            lines: canvasLines,
+            rider: canvasRider,
+            wayBack: canvasWayBack,
+            followsRider: true
+        )
+        .overlay {
+            if canvasRider == nil && canvasLines.allSatisfy({ $0.segments.allSatisfy(\.isEmpty) }) {
+                ContentUnavailableView("Waiting for GPS…", systemImage: "location.magnifyingglass",
+                                       description: Text("Your position and track appear here, with or without a connection."))
             }
-            .ignoresSafeArea()
-            .gesture(
-                MagnifyGesture()
-                    .onChanged { value in
-                        let base = metersAcrossAtPinchStart ?? metersAcross
-                        metersAcrossAtPinchStart = base
-                        metersAcross = min(max(base / value.magnification, 100), 20_000)
-                    }
-                    .onEnded { _ in metersAcrossAtPinchStart = nil }
-            )
+        }
+        .ignoresSafeArea()
     }
 
     // MARK: What to draw without a map
@@ -133,14 +127,6 @@ struct RideScreen: View {
         guard let fix = model.currentFix else { return nil }
         let course = fix.course >= 0 && fix.courseAccuracy >= 0 ? fix.course : nil
         return TrackCanvas.Rider(position: TrackPoint(fix), course: course)
-    }
-
-    private var canvasFocus: TrackCanvas.Focus {
-        if let riderPoint {
-            .rider(riderPoint, metersAcross: metersAcross)
-        } else {
-            .fit
-        }
     }
 
     private var canvasWayBack: (from: TrackPoint, to: TrackPoint)? {

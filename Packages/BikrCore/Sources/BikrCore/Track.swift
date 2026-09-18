@@ -102,4 +102,14 @@ public extension TrackPoint {
         let planar = other.planar(around: self)
         return (east: planar.x, north: planar.y)
     }
+
+    /// The point `east` and `north` meters away — the inverse of `offset(to:)`,
+    /// for panning a drawn map around.
+    func moved(east: Double, north: Double) -> TrackPoint {
+        let metersPerDegree = 6_371_000.0 * .pi / 180
+        var moved = self
+        moved.latitude += north / metersPerDegree
+        moved.longitude += east / (metersPerDegree * cos(latitude * .pi / 180))
+        return moved
+    }
 }

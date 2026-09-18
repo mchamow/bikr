@@ -109,9 +109,8 @@ private struct TrackPreview: View {
                 }
             }
         } else {
-            TrackCanvas(
-                lines: [TrackCanvas.Line(segments: track.segments, color: track.origin.color)],
-                focus: .fit
+            InteractiveTrackCanvas(
+                lines: [TrackCanvas.Line(segments: track.segments, color: track.origin.color)]
             )
         }
     }
