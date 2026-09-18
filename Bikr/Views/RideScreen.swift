@@ -39,7 +39,15 @@ struct RideScreen: View {
                     LocationProblemBanner(problem: problem)
                 }
                 if let track = guide.track {
-                    GuidanceBanner(track: track, status: guide.status, bearingToTrack: bearingToTrack, onStop: model.stopFollowing)
+                    GuidanceBanner(
+                        track: track,
+                        status: guide.status,
+                        bearingToTrack: bearingToTrack,
+                        strayedBy: model.strayedBy,
+                        onStop: model.stopFollowing,
+                        onBackToTrack: model.keepFollowingTheTrack,
+                        onNewRoute: model.trackNewRoute
+                    )
                 }
             }
             .padding(.horizontal)
@@ -231,36 +239,56 @@ private struct GuidanceBanner: View {
     let status: FollowStatus?
     /// Degrees from north towards the track, when off it.
     let bearingToTrack: Double?
+    /// Set while Bikr is asking whether leaving the track was deliberate.
+    let strayedBy: Double?
     let onStop: () -> Void
+    let onBackToTrack: () -> Void
+    let onNewRoute: () -> Void
 
     var body: some View {
         let isOffTrack = status?.isOffTrack == true
-        HStack(spacing: 12) {
-            if isOffTrack, let bearingToTrack {
-                // Points the way back to the track, relative to north.
-                Image(systemName: "arrow.up")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.red)
-                    .rotationEffect(.degrees(bearingToTrack))
-            } else {
-                Image(systemName: isOffTrack ? "exclamationmark.triangle.fill" : "point.bottomleft.forward.to.point.topright.scurvepath")
-                    .font(.title2)
-                    .foregroundStyle(isOffTrack ? .red : .blue)
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(spacing: 12) {
+                if isOffTrack, let bearingToTrack {
+                    // Points the way back to the track, relative to north.
+                    Image(systemName: "arrow.up")
+                        .font(.title2.weight(.bold))
+                        .foregroundStyle(.red)
+                        .rotationEffect(.degrees(bearingToTrack))
+                } else {
+                    Image(systemName: isOffTrack ? "exclamationmark.triangle.fill" : "point.bottomleft.forward.to.point.topright.scurvepath")
+                        .font(.title2)
+                        .foregroundStyle(isOffTrack ? .red : .blue)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(track.name)
+                        .font(.headline)
+                        .lineLimit(1)
+                    Text(detail)
+                        .font(.subheadline)
+                        .foregroundStyle(isOffTrack ? .red : .secondary)
+                        .monospacedDigit()
+                }
+                Spacer()
+                Button("Stop Following", systemImage: "xmark", action: onStop)
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(track.name)
-                    .font(.headline)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.subheadline)
-                    .foregroundStyle(isOffTrack ? .red : .secondary)
-                    .monospacedDigit()
+
+            // Leaving the track is often deliberate, so ask rather than nag.
+            if strayedBy != nil {
+                HStack(spacing: 10) {
+                    Button("Back to Track", action: onBackToTrack)
+                        .buttonStyle(.glassProminent)
+                        .tint(.blue)
+                    Button("Track New Route", action: onNewRoute)
+                        .buttonStyle(.glass)
+                }
+                .font(.subheadline.weight(.semibold))
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
             }
-            Spacer()
-            Button("Stop Following", systemImage: "xmark", action: onStop)
-                .labelStyle(.iconOnly)
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
         }
         .padding(12)
         .glassEffect(in: .rect(cornerRadius: 24))

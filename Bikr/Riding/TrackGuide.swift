@@ -12,6 +12,12 @@ final class TrackGuide {
 
     @ObservationIgnored private var follower: TrackFollower?
 
+    /// Called when the rider leaves the track, comes back to it, or reaches the
+    /// end. What to do about it is the app's decision, not the guide's.
+    @ObservationIgnored var onStray: ((FollowStatus) -> Void)?
+    @ObservationIgnored var onRejoin: (() -> Void)?
+    @ObservationIgnored var onFinish: ((Track) -> Void)?
+
     var isActive: Bool { track != nil }
 
     func follow(_ track: Track) {
@@ -20,7 +26,7 @@ final class TrackGuide {
         self.follower = follower
         status = nil
         position = nil
-        GuideAlerts.requestPermission()
+        GuideAlerts.prepare()
     }
 
     func stop() {
@@ -40,15 +46,16 @@ final class TrackGuide {
         status = new
         position = here
 
-        // No alerts on the first fix: the banner already says where you are.
+        // Nothing to report on the first fix: the banner already says where
+        // the rider is.
         guard let old else { return }
         if new.isOffTrack && !old.isOffTrack {
-            GuideAlerts.offTrack(by: new.distanceFromTrack)
+            onStray?(new)
         } else if !new.isOffTrack && old.isOffTrack {
-            GuideAlerts.backOnTrack()
+            onRejoin?()
         }
         if new.isFinished && !old.isFinished {
-            GuideAlerts.finished(track.name)
+            onFinish?(track)
         }
     }
 }

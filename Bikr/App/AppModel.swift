@@ -20,6 +20,9 @@ final class AppModel {
     /// A ride the app was recording when it last stopped, waiting to be saved
     /// or dropped.
     private(set) var recoveredRide: RecoveredRide?
+    /// How far off the track the rider went, while Bikr waits to hear whether
+    /// that was deliberate.
+    private(set) var strayedBy: Double?
 
     let recorder: RideRecorder
     let guide = TrackGuide()
@@ -44,6 +47,24 @@ final class AppModel {
             self?.currentFix = location
             self?.recorder.record(location)
             self?.guide.update(location)
+        }
+        guide.onStray = { [weak self] status in
+            GuideAlerts.offTrack(by: status.distanceFromTrack)
+            self?.strayedBy = status.distanceFromTrack
+        }
+        guide.onRejoin = { [weak self] in
+            GuideAlerts.backOnTrack()
+            self?.strayedBy = nil
+        }
+        guide.onFinish = { track in
+            GuideAlerts.finished(track.name)
+        }
+        // The same two answers, chosen from the notification.
+        GuideAlerts.onStrayChoice = { [weak self] choice in
+            switch choice {
+            case .backToTrack: self?.keepFollowingTheTrack()
+            case .newRoute: self?.trackNewRoute()
+            }
         }
         reloadSummaries()
     }
@@ -131,7 +152,24 @@ final class AppModel {
 
     func stopFollowing() {
         guide.stop()
+        strayedBy = nil
         updateLocationNeeds()
+    }
+
+    // MARK: Going your own way
+
+    /// Straying was a mistake: keep guiding back to the track.
+    func keepFollowingTheTrack() {
+        strayedBy = nil
+    }
+
+    /// Straying was deliberate: stop guiding, and record where the rider
+    /// actually goes.
+    func trackNewRoute() {
+        stopFollowing()
+        if recorder.state == .idle {
+            startRide()
+        }
     }
 
     // MARK: Library
