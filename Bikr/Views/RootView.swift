@@ -3,6 +3,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @State private var isStarting = true
 
     var body: some View {
         @Bindable var model = model
@@ -12,6 +13,20 @@ struct RootView: View {
             }
             Tab("Tracks", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath", value: .tracks) {
                 TracksScreen()
+            }
+        }
+        .overlay {
+            if isStarting {
+                SplashView()
+                    // A splash is scenery, never a door: taps reach the app.
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
+        }
+        .task {
+            try? await Task.sleep(for: SplashView.visibleFor)
+            withAnimation(.easeOut(duration: SplashView.fadeSeconds)) {
+                isStarting = false
             }
         }
         // GPX files opened from Files, Mail, Safari, AirDrop...
