@@ -124,15 +124,16 @@ final class RideFlowUITests: XCTestCase {
         // rider, and a button brings them back to the middle.
         XCTAssertTrue(app.buttons["Show the Whole Track"].exists, "No way to see the whole track")
         XCTAssertFalse(app.buttons["Centre on Me"].exists, "Already off-centre before anything was dragged")
-        app.swipeLeft()
+        dragTheMap(app)
         let centreOnMe = app.buttons["Centre on Me"]
-        XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5), "Dragging the map didn't free it from the rider")
+        XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5),
+                      "Dragging the map didn't free it from the rider:\n\(app.debugDescription)")
 
         // Left alone, the map goes back to following the rider by itself.
         XCTAssertTrue(waitForItToGo(centreOnMe, within: 20), "The map never went back to following the rider")
 
         // And it can be brought back by hand, without waiting.
-        app.swipeLeft()
+        dragTheMap(app)
         XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5))
         centreOnMe.tap()
         XCTAssertTrue(waitForItToGo(centreOnMe, within: 5), "Still off-centre after centring")
@@ -140,6 +141,15 @@ final class RideFlowUITests: XCTestCase {
         app.buttons["Finish"].tap()
         app.buttons["Discard Ride"].tap()
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 5))
+    }
+
+    /// A deliberate drag across the map. A flick is too quick to be taken for
+    /// a drag on a busy machine.
+    @MainActor
+    private func dragTheMap(_ app: XCUIApplication) {
+        let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.6, dy: 0.35))
+        let to = app.coordinate(withNormalizedOffset: CGVector(dx: 0.25, dy: 0.4))
+        from.press(forDuration: 0.2, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.2)
     }
 
     /// Waits for something on screen to go away.

@@ -51,9 +51,19 @@ rm -rf "$result"
 xcodebuild build-for-testing -project Bikr.xcodeproj -scheme Bikr -destination "$destination" "$@"
 
 trap 'xcrun simctl location "$device" clear >/dev/null 2>&1 || true' EXIT
-# Ride at 8 m/s (about 29 km/h) with a fix every second.
-xcrun simctl location "$device" start --speed 8 --interval 1 \
-  50.0614,19.9366 50.0640,19.9450 50.0680,19.9520 50.0720,19.9610 50.0760,19.9700 50.0800,19.9800
+# Ride at 8 m/s (about 29 km/h) with a fix every second, up and down the same
+# route several times: a whole test run takes longer than one pass, and a
+# simulator that has stopped moving fails tests that have nothing to do with it.
+route=(50.0614,19.9366 50.0640,19.9450 50.0680,19.9520 50.0720,19.9610 50.0760,19.9700 50.0800,19.9800)
+waypoints=()
+for pass in 1 2 3 4; do
+  if (( pass % 2 )); then
+    waypoints+=("${route[@]}")
+  else
+    for (( i = ${#route[@]}; i > 0; i-- )); do waypoints+=("${route[i]}"); done
+  fi
+done
+xcrun simctl location "$device" start --speed 8 --interval 1 "${waypoints[@]}"
 
 xcodebuild test-without-building -project Bikr.xcodeproj -scheme Bikr \
   -destination "$destination" -only-testing:BikrUITests -resultBundlePath "$result" "$@"
