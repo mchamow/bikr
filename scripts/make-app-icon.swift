@@ -38,6 +38,21 @@ let bottomBracket = CGPoint(x: 496, y: 404)
 let seat = CGPoint(x: 412, y: 620)
 let headTop = CGPoint(x: 648, y: 636)
 
+// Put the bicycle in the middle: work out how far the ink actually spans,
+// including the thickness of the strokes, and shift it to the centre.
+let saddleTop = seat.y + 46 + 20
+let handlebarTop = headTop.y + 58 + 19
+let ink = (
+    left: rearHub.x - wheelRadius - 25,
+    right: frontHub.x + wheelRadius + 25,
+    bottom: rearHub.y - wheelRadius - 25,
+    top: max(rearHub.y + wheelRadius + 25, max(saddleTop, handlebarTop))
+)
+context.translateBy(
+    x: (side - (ink.left + ink.right)) / 2,
+    y: (side - (ink.bottom + ink.top)) / 2
+)
+
 context.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 1))
 context.setLineCap(.round)
 context.setLineJoin(.round)
