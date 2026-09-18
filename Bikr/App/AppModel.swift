@@ -30,10 +30,14 @@ final class AppModel {
     let network = NetworkMonitor()
     /// The latest fix, for drawing the rider when there is no map.
     private(set) var currentFix: CLLocation?
+    /// The way the rider is going, kept from the last fix that was moving so
+    /// the map doesn't spin while they stand still.
+    private(set) var heading: Double?
     /// Location runs while the ride screen is open, so it can show where you are.
     var isRideScreenVisible = false { didSet { updateLocationNeeds() } }
 
     /// Only to read the authorization status; making one doesn't prompt.
+    @ObservationIgnored private var headings = HeadingEstimator()
     @ObservationIgnored private let authorization = CLLocationManager()
     @ObservationIgnored private let store: TrackStore
     @ObservationIgnored private let draft: RideDraft
@@ -45,6 +49,7 @@ final class AppModel {
         self.recoveredRide = draft.recover()
         location.onLocation = { [weak self] location in
             self?.currentFix = location
+            self?.updateHeading(from: location)
             self?.recorder.record(location)
             self?.guide.update(location)
         }
@@ -221,6 +226,15 @@ final class AppModel {
     }
 
     // MARK: Helpers
+
+    /// GPS reports a course when it is sure of one; otherwise the way the
+    /// rider is going comes from where they have just been.
+    private func updateHeading(from location: CLLocation) {
+        let reported = location.course >= 0 && location.courseAccuracy >= 0 && location.speed > 1
+            ? location.course
+            : nil
+        heading = headings.heading(at: TrackPoint(location), course: reported)
+    }
 
     private func updateLocationNeeds() {
         let riding = recorder.state == .recording || guide.isActive

@@ -13,6 +13,7 @@ struct RideScreen: View {
 
     private var recorder: RideRecorder { model.recorder }
     private var guide: TrackGuide { model.guide }
+    private var isRiding: Bool { recorder.state == .recording || guide.isActive }
     /// Apple's map when it can be shown; Bikr draws the ride itself when not.
     private var usesAppleMap: Bool { model.network.isOnline }
 
@@ -69,8 +70,34 @@ struct RideScreen: View {
                 withAnimation { camera = .rect(track.mapRect) }
             }
         }
+        // Riding, the map turns and tilts the way a navigation app does.
+        .onChange(of: model.currentFix?.timestamp) { rideAlongWithTheRider() }
         .onAppear { model.isRideScreenVisible = true }
         .onDisappear { model.isRideScreenVisible = false }
+    }
+
+    /// How far up the road to aim the camera. Centring it on the rider puts
+    /// them halfway up what is left of the map above the stats, which wastes
+    /// the screen on where they have already been.
+    private static let lookAhead = 75.0
+
+    /// Keeps Apple's map under the rider, facing the way they are going —
+    /// unless they have taken hold of the map themselves.
+    private func rideAlongWithTheRider() {
+        guard isRiding, !camera.positionedByUser, let fix = model.currentFix else { return }
+        let heading = model.heading ?? 0
+        let ahead = TrackPoint(fix).moved(
+            east: sin(heading * .pi / 180) * Self.lookAhead,
+            north: cos(heading * .pi / 180) * Self.lookAhead
+        )
+        withAnimation(.linear(duration: 0.9)) {
+            camera = .camera(MapCamera(
+                centerCoordinate: ahead.coordinate,
+                distance: 500,
+                heading: heading,
+                pitch: 55
+            ))
+        }
     }
 
     private var appleMap: some View {
@@ -97,7 +124,8 @@ struct RideScreen: View {
             lines: canvasLines,
             rider: canvasRider,
             wayBack: canvasWayBack,
-            followsRider: true
+            followsRider: true,
+            heading: isRiding ? model.heading : nil
         )
         .overlay {
             if canvasRider == nil && canvasLines.allSatisfy({ $0.segments.allSatisfy(\.isEmpty) }) {
