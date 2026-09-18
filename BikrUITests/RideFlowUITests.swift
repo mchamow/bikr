@@ -61,6 +61,62 @@ final class RideFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Follow a Track"].waitForExistence(timeout: 5))
     }
 
+    /// A ride cut short by iOS shutting the app down is offered back on the
+    /// next launch, not lost.
+    @MainActor
+    func testRecoversAnInterruptedRide() {
+        let app = XCUIApplication()
+        app.launch()
+
+        recordUntilMoving(app)
+
+        app.terminate()   // as if iOS had shut the app down mid-ride
+        app.launch()
+
+        let save = app.buttons["Save Ride"]
+        XCTAssertTrue(save.waitForExistence(timeout: 15), "The interrupted ride wasn't offered back:\n\(app.debugDescription)")
+        save.tap()
+
+        let ride = app.collectionViews.buttons.element(boundBy: 0)
+        XCTAssertTrue(ride.waitForExistence(timeout: 10), "The recovered ride is missing from the Tracks tab")
+        XCTAssertTrue(hasPositiveDistance(ride.label), "The recovered ride has no distance: \(ride.label)")
+    }
+
+    /// Putting the decision off and starting another ride keeps the
+    /// interrupted one rather than overwriting it.
+    @MainActor
+    func testKeepsAnInterruptedRideWhenTheNextOneStarts() {
+        let app = XCUIApplication()
+        app.launch()
+        recordUntilMoving(app)
+
+        app.terminate()
+        app.launch()
+        let later = app.buttons["Decide Later"]
+        XCTAssertTrue(later.waitForExistence(timeout: 15), "The interrupted ride wasn't offered back")
+        later.tap()
+
+        // Starting a ride has to save the interrupted one first.
+        app.buttons["Start Ride"].tap()
+        XCTAssertTrue(app.buttons["Finish"].waitForExistence(timeout: 10))
+        app.buttons["Finish"].tap()
+        app.buttons["Discard Ride"].tap()
+
+        app.tabBars.buttons["Tracks"].tap()
+        let ride = app.collectionViews.buttons.element(boundBy: 0)
+        XCTAssertTrue(ride.waitForExistence(timeout: 10), "The interrupted ride was lost")
+        XCTAssertTrue(hasPositiveDistance(ride.label), "The interrupted ride has no distance: \(ride.label)")
+    }
+
+    /// Starts recording and waits until the ride has covered some ground.
+    @MainActor
+    private func recordUntilMoving(_ app: XCUIApplication) {
+        XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 10))
+        app.buttons["Start Ride"].tap()
+        allowLocationAccessIfAsked()
+        XCTAssertTrue(waitForRecordedDistance(in: app), "No distance was recorded while the simulator was moving")
+    }
+
     /// Waits until some stat on screen reads like a distance above zero.
     @MainActor
     private func waitForRecordedDistance(in app: XCUIApplication, timeout: TimeInterval = 30) -> Bool {

@@ -20,6 +20,12 @@ final class RideRecorder {
     @ObservationIgnored private var accumulator = StatsAccumulator()
     @ObservationIgnored private var filter = LocationFilter()
     @ObservationIgnored private var speedEstimator = SpeedEstimator()
+    /// Mirrors the ride to disk so it survives the app being shut down.
+    @ObservationIgnored private let draft: RideDraft?
+
+    init(draft: RideDraft? = nil) {
+        self.draft = draft
+    }
     /// Recording time before the current stretch (i.e. up to the last pause).
     private var activeTimeBeforeStretch: TimeInterval = 0
     private var stretchStartedAt: Date?
@@ -36,6 +42,7 @@ final class RideRecorder {
         startedAt = now
         stretchStartedAt = now
         state = .recording
+        draft?.start(at: now)
     }
 
     func pause(at now: Date = .now) {
@@ -54,11 +61,13 @@ final class RideRecorder {
         accumulator.startSegment()
         filter.reset()
         speedEstimator.reset()
+        draft?.startSegment()
         stretchStartedAt = now
         state = .recording
     }
 
-    /// Ends the ride and returns what was recorded (empty if no GPS fix made it).
+    /// Ends the ride and returns what was recorded (empty if no GPS fix made
+    /// it). The draft on disk stays until the ride has been saved or dropped.
     func finish() -> [[TrackPoint]] {
         let recorded = segments.filter { !$0.isEmpty }
         reset()
@@ -73,6 +82,7 @@ final class RideRecorder {
         }
         guard filter.accept(point, horizontalAccuracy: location.horizontalAccuracy) else { return }
         segments[segments.count - 1].append(point)
+        draft?.append(point)
         accumulator.add(point)
         stats = accumulator.stats
     }

@@ -16,15 +16,22 @@ final class AppModel {
     /// Shown to the user in an alert, then cleared.
     var message: String?
     private(set) var summaries: [TrackSummary] = []
+    /// A ride the app was recording when it last stopped, waiting to be saved
+    /// or dropped.
+    private(set) var recoveredRide: RecoveredRide?
 
-    let recorder = RideRecorder()
+    let recorder: RideRecorder
     let guide = TrackGuide()
     let location = LocationFeed()
 
     @ObservationIgnored private let store: TrackStore
+    @ObservationIgnored private let draft: RideDraft
 
-    init(store: TrackStore = .standard) {
+    init(store: TrackStore = .standard, draft: RideDraft = .standard) {
         self.store = store
+        self.draft = draft
+        self.recorder = RideRecorder(draft: draft)
+        self.recoveredRide = draft.recover()
         location.onLocation = { [recorder, guide] location in
             recorder.record(location)
             guide.update(location)
@@ -38,6 +45,9 @@ final class AppModel {
     // MARK: Riding
 
     func startRide() {
+        // Recording would overwrite a draft that hasn't been dealt with, so
+        // keep that ride rather than lose it.
+        storeRecoveredRide()
         recorder.start()
         updateLocationNeeds()
     }
@@ -56,13 +66,48 @@ final class AppModel {
         let startedAt = recorder.startedAt ?? .now
         let segments = recorder.finish()
         updateLocationNeeds()
-        guard save else { return }
+        guard save else {
+            draft.discard()
+            return
+        }
         guard !segments.isEmpty else {
+            draft.discard()
             message = "Nothing to save: no GPS position was recorded during this ride."
             return
         }
         let track = Track(name: Self.rideName(startedAt: startedAt), origin: .recorded, createdAt: startedAt, segments: segments)
-        perform("save the ride") { try store.save(track) }
+        // The draft stays if saving fails, so the ride can be recovered later.
+        if perform("save the ride", { try store.save(track) }) {
+            draft.discard()
+        }
+    }
+
+    // MARK: An interrupted ride
+
+    func saveRecoveredRide() {
+        if storeRecoveredRide() {
+            tab = .tracks
+        }
+    }
+
+    func discardRecoveredRide() {
+        draft.discard()
+        recoveredRide = nil
+    }
+
+    @discardableResult
+    private func storeRecoveredRide() -> Bool {
+        guard let recovered = recoveredRide else { return false }
+        let track = Track(
+            name: Self.rideName(startedAt: recovered.startedAt),
+            origin: .recorded,
+            createdAt: recovered.startedAt,
+            segments: recovered.segments
+        )
+        guard perform("save the interrupted ride", { try store.save(track) }) else { return false }
+        draft.discard()
+        recoveredRide = nil
+        return true
     }
 
     // MARK: Following
@@ -149,13 +194,19 @@ final class AppModel {
         }
     }
 
-    private func perform(_ action: String, _ body: () throws -> Void) {
+    /// Runs `body`, turning any error into a message for the user. Returns
+    /// whether it worked.
+    @discardableResult
+    private func perform(_ action: String, _ body: () throws -> Void) -> Bool {
+        var succeeded = true
         do {
             try body()
         } catch {
             message = "Couldn't \(action): \(error.localizedDescription)"
+            succeeded = false
         }
         reloadSummaries()
+        return succeeded
     }
 
     static func rideName(startedAt date: Date) -> String {
@@ -170,4 +221,8 @@ final class AppModel {
 
 extension TrackStore {
     static let standard = TrackStore(directory: URL.applicationSupportDirectory.appending(path: "Tracks"))
+}
+
+extension RideDraft {
+    static let standard = RideDraft(url: URL.applicationSupportDirectory.appending(path: "ride-in-progress.jsonl"))
 }
