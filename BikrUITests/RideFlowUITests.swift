@@ -117,7 +117,6 @@ final class RideFlowUITests: XCTestCase {
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 10), "No offline notice shown")
-        XCTAssertFalse(app.buttons["Hide Map"].exists, "Offered Apple's map with no connection")
 
         recordUntilMoving(app)
 

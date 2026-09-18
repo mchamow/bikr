@@ -7,14 +7,14 @@ import SwiftUI
 /// there is one.
 struct RideScreen: View {
     @Environment(AppModel.self) private var model
-    @AppStorage("showsAppleMap") private var showsAppleMap = true
     @State private var camera = MapCameraPosition.userLocation(fallback: .automatic)
     @State private var isPickingTrack = false
     @State private var isConfirmingFinish = false
 
     private var recorder: RideRecorder { model.recorder }
     private var guide: TrackGuide { model.guide }
-    private var usesAppleMap: Bool { showsAppleMap && model.network.isOnline }
+    /// Apple's map when it can be shown; Bikr draws the ride itself when not.
+    private var usesAppleMap: Bool { model.network.isOnline }
 
     var body: some View {
         Group {
@@ -152,14 +152,6 @@ struct RideScreen: View {
                 if !guide.isActive {
                     Button("Follow a Track", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath") {
                         isPickingTrack = true
-                    }
-                    .labelStyle(.iconOnly)
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                }
-                if model.network.isOnline {
-                    Button(showsAppleMap ? "Hide Map" : "Show Map", systemImage: showsAppleMap ? "map.fill" : "map") {
-                        showsAppleMap.toggle()
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
