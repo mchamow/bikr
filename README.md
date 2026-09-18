@@ -8,6 +8,7 @@ A super simple bike ride recorder and track follower for iPhone (iOS 26+).
 - **Live stats**: time, distance, current and average speed.
 - **Ride history**: distance, moving and total time, average and max speed, climb, and a map of each ride.
 - **GPX**: share any track as a `.gpx` file. Import GPX files from the Tracks tab, or open them in Bikr from Files, Mail or Safari.
+- **Works with no signal**: recording, stats, following a track and its warnings never touch the network. Without a connection Bikr draws your track, position, heading, a north arrow and a scale bar itself. Apple's map is the extra on top when you're online, and the map button turns it off any time.
 - **Rides survive a crash**: the ride is written to disk as you go, so if iOS shuts Bikr down mid-ride, the next launch offers the ride back.
 - **Follow a track**: pick a recorded ride or an imported GPX file. Bikr shows it on the map with distance done and to go. When you stray more than 40 m it warns you with a haptic and a notification, and a dashed line leads back to the track.
 
@@ -19,7 +20,7 @@ Config/Info.plist        Location + background mode, GPX file type
 Bikr/
   App/                   App entry point and AppModel (app-wide state)
   Riding/                GPS feed, ride recorder, track guide, alerts
-  Views/                 Ride screen, Tracks list, track detail
+  Views/                 Ride screen, Tracks list, track detail, offline drawing
   Support/               Formatting, GPX sharing, CoreLocation bridges
 BikrUITests/             UI smoke test of the record → save → follow flow
 scripts/                 Test runners, and make-app-icon.swift which draws the icon

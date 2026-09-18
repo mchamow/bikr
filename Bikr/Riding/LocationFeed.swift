@@ -20,14 +20,17 @@ final class LocationFeed {
     @ObservationIgnored private var serviceSession: CLServiceSession?
     @ObservationIgnored private var backgroundSession: CLBackgroundActivitySession?
 
-    func start() {
-        guard !isRunning else { return }
+    /// - Parameter inBackground: keep running with the screen locked. Only for
+    ///   an actual ride; merely looking at the map doesn't need it.
+    func start(inBackground: Bool) {
+        if isRunning {
+            keepRunningInBackground(inBackground)
+            return
+        }
         isRunning = true
         // Asks for "While Using" permission and precise location if needed.
         serviceSession = CLServiceSession(authorization: .whenInUse, fullAccuracyPurposeKey: "RideTracking")
-        // Keeps updates coming with the screen locked (needs the `location`
-        // background mode and must start while the app is in the foreground).
-        backgroundSession = CLBackgroundActivitySession()
+        keepRunningInBackground(inBackground)
         updates = Task { [weak self] in
             do {
                 for try await update in CLLocationUpdate.liveUpdates(.fitness) {
@@ -36,6 +39,20 @@ final class LocationFeed {
             } catch {
                 self?.problem = .unavailable
             }
+        }
+    }
+
+    /// Holding a background activity session is what lets a ride keep recording
+    /// with the screen locked; it must be started in the foreground.
+    private func keepRunningInBackground(_ wanted: Bool) {
+        switch (wanted, backgroundSession) {
+        case (true, nil):
+            backgroundSession = CLBackgroundActivitySession()
+        case (false, .some(let session)):
+            session.invalidate()
+            backgroundSession = nil
+        default:
+            break
         }
     }
 

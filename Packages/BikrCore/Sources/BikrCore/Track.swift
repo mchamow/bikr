@@ -84,3 +84,22 @@ public struct TrackSummary: Codable, Identifiable, Hashable, Sendable {
     public var createdAt: Date
     public var stats: TrackStats
 }
+
+public extension TrackPoint {
+    /// Compass bearing to `other`: degrees clockwise from north, 0..<360.
+    func bearing(to other: TrackPoint) -> Double {
+        let lat1 = latitude * .pi / 180, lat2 = other.latitude * .pi / 180
+        let dLon = (other.longitude - longitude) * .pi / 180
+        let y = sin(dLon) * cos(lat2)
+        let x = cos(lat1) * sin(lat2) - sin(lat1) * cos(lat2) * cos(dLon)
+        let degrees = atan2(y, x) * 180 / .pi
+        return degrees < 0 ? degrees + 360 : degrees
+    }
+
+    /// How far `other` lies east and north of this point, in meters. Good for
+    /// drawing a small area around the rider without a map.
+    func offset(to other: TrackPoint) -> (east: Double, north: Double) {
+        let planar = other.planar(around: self)
+        return (east: planar.x, north: planar.y)
+    }
+}

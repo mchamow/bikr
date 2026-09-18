@@ -108,6 +108,24 @@ final class RideFlowUITests: XCTestCase {
         XCTAssertTrue(hasPositiveDistance(ride.label), "The interrupted ride has no distance: \(ride.label)")
     }
 
+    /// With no connection there is no map, but the ride still records: GPS
+    /// never needed the network.
+    @MainActor
+    func testRecordsWithoutAConnection() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-BikrForceOffline", "YES"]
+        app.launch()
+
+        XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 10), "No offline notice shown")
+        XCTAssertFalse(app.buttons["Hide Map"].exists, "Offered Apple's map with no connection")
+
+        recordUntilMoving(app)
+
+        app.buttons["Finish"].tap()
+        app.buttons["Discard Ride"].tap()
+        XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 5))
+    }
+
     /// Starts recording and waits until the ride has covered some ground.
     @MainActor
     private func recordUntilMoving(_ app: XCUIApplication) {
@@ -154,9 +172,11 @@ final class RideFlowUITests: XCTestCase {
 
         let buttons = prompt.buttons.allElementsBoundByIndex
         print("Location prompt: \(buttons.map(\.label))")
-        // Fall back to the first button: the two "allow" choices come before
-        // "don't allow", whatever language the simulator runs in.
-        let allow = buttons.first { ["Allow While Using App", "Allow Once"].contains($0.label) } ?? buttons.first
-        allow?.tap()
+        // "While using" is what we want: "Allow Once" is forgotten when the app
+        // relaunches. It is the second of the three buttons in every language,
+        // so fall back to that rather than to the first one.
+        let whileUsing = buttons.first { $0.label == "Allow While Using App" }
+        let byPosition = buttons.count >= 3 ? buttons[1] : buttons.first
+        (whileUsing ?? byPosition)?.tap()
     }
 }

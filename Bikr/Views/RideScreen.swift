@@ -2,40 +2,44 @@ import BikrCore
 import MapKit
 import SwiftUI
 
-/// The map you ride with: record, pause, finish, and follow a track.
+/// The screen you ride with: record, pause, finish, and follow a track.
+/// Everything here works without a connection; Apple's map is the extra when
+/// there is one.
 struct RideScreen: View {
     @Environment(AppModel.self) private var model
+    @AppStorage("showsAppleMap") private var showsAppleMap = true
     @State private var camera = MapCameraPosition.userLocation(fallback: .automatic)
+    @State private var metersAcross = 800.0
+    @State private var metersAcrossAtPinchStart: Double?
     @State private var isPickingTrack = false
     @State private var isConfirmingFinish = false
 
     private var recorder: RideRecorder { model.recorder }
     private var guide: TrackGuide { model.guide }
+    private var usesAppleMap: Bool { showsAppleMap && model.network.isOnline }
 
     var body: some View {
-        Map(position: $camera) {
-            if let track = guide.track {
-                TrackLines(segments: track.segments, color: .blue.opacity(0.7), width: 7)
+        Group {
+            if usesAppleMap {
+                appleMap
+            } else {
+                drawnMap
             }
-            if let status = guide.status, status.isOffTrack, let here = guide.position {
-                MapPolyline(coordinates: [here.coordinate, status.closestPoint.coordinate])
-                    .stroke(.red, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 8]))
-            }
-            TrackLines(segments: recorder.segments, color: .orange)
-            UserAnnotation()
-        }
-        .mapControls {
-            MapUserLocationButton()
-            MapCompass()
-            MapScaleView()
         }
         .safeAreaInset(edge: .top) {
             VStack(spacing: 8) {
+                if !model.network.isOnline {
+                    NoticeBanner(
+                        icon: "wifi.slash",
+                        tint: .secondary,
+                        text: "No connection. Bikr keeps recording and guiding; only the map is missing."
+                    )
+                }
                 if let problem = model.location.problem {
                     LocationProblemBanner(problem: problem)
                 }
                 if let track = guide.track {
-                    GuidanceBanner(track: track, status: guide.status, onStop: model.stopFollowing)
+                    GuidanceBanner(track: track, status: guide.status, bearingToTrack: bearingToTrack, onStop: model.stopFollowing)
                 }
             }
             .padding(.horizontal)
@@ -59,7 +63,91 @@ struct RideScreen: View {
                 withAnimation { camera = .rect(track.mapRect) }
             }
         }
+        .onAppear { model.isRideScreenVisible = true }
+        .onDisappear { model.isRideScreenVisible = false }
     }
+
+    private var appleMap: some View {
+        Map(position: $camera) {
+            if let track = guide.track {
+                TrackLines(segments: track.segments, color: .blue.opacity(0.7), width: 7)
+            }
+            if let status = guide.status, status.isOffTrack, let here = guide.position {
+                MapPolyline(coordinates: [here.coordinate, status.closestPoint.coordinate])
+                    .stroke(.red, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 8]))
+            }
+            TrackLines(segments: recorder.segments, color: .orange)
+            UserAnnotation()
+        }
+        .mapControls {
+            MapUserLocationButton()
+            MapCompass()
+            MapScaleView()
+        }
+    }
+
+    private var drawnMap: some View {
+        TrackCanvas(lines: canvasLines, focus: canvasFocus, rider: canvasRider, wayBack: canvasWayBack)
+            .overlay {
+                if canvasRider == nil && canvasLines.allSatisfy({ $0.segments.allSatisfy(\.isEmpty) }) {
+                    ContentUnavailableView("Waiting for GPS…", systemImage: "location.magnifyingglass",
+                                           description: Text("Your position and track appear here, with or without a connection."))
+                }
+            }
+            .ignoresSafeArea()
+            .gesture(
+                MagnifyGesture()
+                    .onChanged { value in
+                        let base = metersAcrossAtPinchStart ?? metersAcross
+                        metersAcrossAtPinchStart = base
+                        metersAcross = min(max(base / value.magnification, 100), 20_000)
+                    }
+                    .onEnded { _ in metersAcrossAtPinchStart = nil }
+            )
+    }
+
+    // MARK: What to draw without a map
+
+    private var canvasLines: [TrackCanvas.Line] {
+        var lines: [TrackCanvas.Line] = []
+        if let track = guide.track {
+            lines.append(TrackCanvas.Line(segments: track.segments, color: .blue.opacity(0.8), width: 6))
+        }
+        lines.append(TrackCanvas.Line(segments: recorder.segments, color: .orange, width: 4))
+        return lines
+    }
+
+    private var riderPoint: TrackPoint? {
+        model.currentFix.map(TrackPoint.init)
+    }
+
+    private var canvasRider: TrackCanvas.Rider? {
+        guard let fix = model.currentFix else { return nil }
+        let course = fix.course >= 0 && fix.courseAccuracy >= 0 ? fix.course : nil
+        return TrackCanvas.Rider(position: TrackPoint(fix), course: course)
+    }
+
+    private var canvasFocus: TrackCanvas.Focus {
+        if let riderPoint {
+            .rider(riderPoint, metersAcross: metersAcross)
+        } else {
+            .fit
+        }
+    }
+
+    private var canvasWayBack: (from: TrackPoint, to: TrackPoint)? {
+        guard let status = guide.status, status.isOffTrack, let riderPoint else { return nil }
+        return (from: riderPoint, to: status.closestPoint)
+    }
+
+    /// Which way the track lies, for the arrow in the guidance banner.
+    private var bearingToTrack: Double? {
+        guard let status = guide.status, status.isOffTrack else { return nil }
+        let from = riderPoint ?? guide.position
+        return from?.bearing(to: status.closestPoint)
+    }
+
+    // MARK: Controls
 
     private var controls: some View {
         VStack(spacing: 12) {
@@ -70,6 +158,14 @@ struct RideScreen: View {
                 if !guide.isActive {
                     Button("Follow a Track", systemImage: "point.bottomleft.forward.to.point.topright.scurvepath") {
                         isPickingTrack = true
+                    }
+                    .labelStyle(.iconOnly)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                }
+                if model.network.isOnline {
+                    Button(showsAppleMap ? "Hide Map" : "Show Map", systemImage: showsAppleMap ? "map.fill" : "map") {
+                        showsAppleMap.toggle()
                     }
                     .labelStyle(.iconOnly)
                     .buttonStyle(.glass)
@@ -133,14 +229,24 @@ private struct LiveStats: View {
 private struct GuidanceBanner: View {
     let track: Track
     let status: FollowStatus?
+    /// Degrees from north towards the track, when off it.
+    let bearingToTrack: Double?
     let onStop: () -> Void
 
     var body: some View {
         let isOffTrack = status?.isOffTrack == true
         HStack(spacing: 12) {
-            Image(systemName: isOffTrack ? "exclamationmark.triangle.fill" : "point.bottomleft.forward.to.point.topright.scurvepath")
-                .font(.title2)
-                .foregroundStyle(isOffTrack ? .red : .blue)
+            if isOffTrack, let bearingToTrack {
+                // Points the way back to the track, relative to north.
+                Image(systemName: "arrow.up")
+                    .font(.title2.weight(.bold))
+                    .foregroundStyle(.red)
+                    .rotationEffect(.degrees(bearingToTrack))
+            } else {
+                Image(systemName: isOffTrack ? "exclamationmark.triangle.fill" : "point.bottomleft.forward.to.point.topright.scurvepath")
+                    .font(.title2)
+                    .foregroundStyle(isOffTrack ? .red : .blue)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(track.name)
                     .font(.headline)
@@ -163,12 +269,31 @@ private struct GuidanceBanner: View {
     private var detail: String {
         guard let status else { return String(localized: "Waiting for GPS…") }
         if status.isOffTrack {
-            return String(localized: "Off track · \(Format.distance(status.distanceFromTrack)) away")
+            return String(localized: "Off track · \(Format.distance(status.distanceFromTrack)) back to it")
         }
         if status.isFinished {
             return String(localized: "You've reached the end")
         }
         return String(localized: "\(Format.distance(status.distanceRemaining)) to go · \(Format.distance(status.distanceDone)) done")
+    }
+}
+
+private struct NoticeBanner: View {
+    let icon: String
+    let tint: Color
+    let text: LocalizedStringKey
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(tint)
+            Text(text)
+                .font(.subheadline)
+            Spacer(minLength: 0)
+        }
+        .padding(12)
+        .glassEffect(in: .rect(cornerRadius: 24))
+        .accessibilityIdentifier("offlineBanner")
     }
 }
 

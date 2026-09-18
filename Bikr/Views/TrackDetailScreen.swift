@@ -66,7 +66,7 @@ struct TrackDetailScreen: View {
         if let track, let summary {
             ScrollView {
                 VStack(spacing: 20) {
-                    TrackMap(track: track)
+                    TrackPreview(track: track, showsAppleMap: model.network.isOnline)
                         .frame(height: 320)
                         .clipShape(.rect(cornerRadius: 24))
                     TrackStatsGrid(stats: summary.stats)
@@ -90,20 +90,29 @@ struct TrackDetailScreen: View {
     }
 }
 
-private struct TrackMap: View {
+/// Apple's map when there is a connection, the drawn track when there isn't.
+private struct TrackPreview: View {
     let track: Track
+    let showsAppleMap: Bool
 
     var body: some View {
-        Map(initialPosition: .rect(track.mapRect)) {
-            TrackLines(segments: track.segments, color: track.origin.color)
-            if let start = track.points.first {
-                Marker("Start", systemImage: "flag.fill", coordinate: start.coordinate)
-                    .tint(.green)
+        if showsAppleMap {
+            Map(initialPosition: .rect(track.mapRect)) {
+                TrackLines(segments: track.segments, color: track.origin.color)
+                if let start = track.points.first {
+                    Marker("Start", systemImage: "flag.fill", coordinate: start.coordinate)
+                        .tint(.green)
+                }
+                if let end = track.points.last {
+                    Marker("Finish", systemImage: "flag.checkered", coordinate: end.coordinate)
+                        .tint(.red)
+                }
             }
-            if let end = track.points.last {
-                Marker("Finish", systemImage: "flag.checkered", coordinate: end.coordinate)
-                    .tint(.red)
-            }
+        } else {
+            TrackCanvas(
+                lines: [TrackCanvas.Line(segments: track.segments, color: track.origin.color)],
+                focus: .fit
+            )
         }
     }
 }

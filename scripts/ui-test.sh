@@ -38,6 +38,10 @@ echo "Riding on: $device"
 xcrun simctl boot "$device" 2>/dev/null || true
 xcrun simctl bootstatus "$device" >/dev/null
 
+# Grant location up front: answering the prompt per test is flaky, because
+# "Allow Once" doesn't survive the relaunch each test does.
+xcrun simctl privacy "$device" grant location com.michalchamow.bikr >/dev/null 2>&1 || true
+
 destination="platform=iOS Simulator,name=$device"
 result="${BIKR_RESULT_BUNDLE:-build/ui-test.xcresult}"
 rm -rf "$result"

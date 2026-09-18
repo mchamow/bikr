@@ -1,4 +1,5 @@
 import BikrCore
+import CoreLocation
 import Foundation
 import Observation
 import UIKit
@@ -23,7 +24,14 @@ final class AppModel {
     let recorder: RideRecorder
     let guide = TrackGuide()
     let location = LocationFeed()
+    let network = NetworkMonitor()
+    /// The latest fix, for drawing the rider when there is no map.
+    private(set) var currentFix: CLLocation?
+    /// Location runs while the ride screen is open, so it can show where you are.
+    var isRideScreenVisible = false { didSet { updateLocationNeeds() } }
 
+    /// Only to read the authorization status; making one doesn't prompt.
+    @ObservationIgnored private let authorization = CLLocationManager()
     @ObservationIgnored private let store: TrackStore
     @ObservationIgnored private let draft: RideDraft
 
@@ -32,9 +40,10 @@ final class AppModel {
         self.draft = draft
         self.recorder = RideRecorder(draft: draft)
         self.recoveredRide = draft.recover()
-        location.onLocation = { [recorder, guide] location in
-            recorder.record(location)
-            guide.update(location)
+        location.onLocation = { [weak self] location in
+            self?.currentFix = location
+            self?.recorder.record(location)
+            self?.guide.update(location)
         }
         reloadSummaries()
     }
@@ -176,11 +185,15 @@ final class AppModel {
     // MARK: Helpers
 
     private func updateLocationNeeds() {
-        let needed = recorder.state == .recording || guide.isActive
-        if needed {
-            location.start()
+        let riding = recorder.state == .recording || guide.isActive
+        // Merely looking at the ride screen shows your position once you have
+        // allowed it, but never triggers the permission prompt by itself.
+        let allowed = [.authorizedWhenInUse, .authorizedAlways].contains(authorization.authorizationStatus)
+        if riding || (isRideScreenVisible && allowed) {
+            location.start(inBackground: riding)
         } else {
             location.stop()
+            currentFix = nil
         }
         // Keep the screen on for a phone mounted on the handlebar.
         UIApplication.shared.isIdleTimerDisabled = recorder.state != .idle || guide.isActive
