@@ -12,8 +12,10 @@ public struct TrackStats: Codable, Hashable, Sendable {
     /// Meters climbed.
     public var elevationGain: Double = 0
 
-    /// m/s over moving time.
-    public var averageSpeed: Double { movingTime > 0 ? distance / movingTime : 0 }
+    /// m/s over moving time. A couple of seconds of riding says nothing about
+    /// an average, and one bad fix would make it absurd, so it stays at zero
+    /// until there is something to average.
+    public var averageSpeed: Double { movingTime >= 5 ? distance / movingTime : 0 }
 
     public static let zero = TrackStats()
 

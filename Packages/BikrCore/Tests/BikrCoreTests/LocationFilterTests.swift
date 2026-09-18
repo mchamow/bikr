@@ -42,8 +42,24 @@ struct LocationFilterTests {
     }
 
     @Test func acceptsMovementBiggerThanTheUncertainty() {
-        let moved = shifted(points[0], by: 14).with(timestamp: points[1].timestamp)
-        #expect(accepted([(points[0], 10), (moved, 10)]) == [true, true])
+        // Already riding at 7 m/s when the ride started.
+        let start = points[0].with(speed: 7)
+        let moved = shifted(points[0], by: 14).with(timestamp: points[1].timestamp).with(speed: 7)
+        #expect(accepted([(start, 10), (moved, 10)]) == [true, true])
+    }
+
+    @Test func waitsForAFixWorthStartingFrom() {
+        // 20 m of uncertainty is no place to measure a ride from.
+        #expect(accepted([(points[0], 20), (points[0], 12)]) == [false, true])
+    }
+
+    @Test func rejectsALeapNoBicycleCouldMake() {
+        // 20.8 m in one second from a standing start is 74 km/h.
+        let leap = shifted(points[0], by: 20.8).with(timestamp: points[0].timestamp?.addingTimeInterval(1))
+        // Riding on: 12 m over four seconds, which a bicycle can do and which
+        // a 10 m fix can tell apart from wandering.
+        let real = shifted(points[0], by: 12).with(timestamp: points[0].timestamp?.addingTimeInterval(4))
+        #expect(accepted([(points[0], 10), (leap, 10), (real, 10)]) == [true, false, true])
     }
 
     @Test func believesGPSWhenItReportsNoSpeed() {
@@ -72,6 +88,12 @@ private extension TrackPoint {
     func with(timestamp: Date?) -> TrackPoint {
         var copy = self
         copy.timestamp = timestamp
+        return copy
+    }
+
+    func with(speed: Double?) -> TrackPoint {
+        var copy = self
+        copy.speed = speed
         return copy
     }
 }
