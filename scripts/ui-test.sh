@@ -38,15 +38,18 @@ echo "Riding on: $device"
 xcrun simctl boot "$device" 2>/dev/null || true
 xcrun simctl bootstatus "$device" >/dev/null
 
-# Ride at 8 m/s (about 29 km/h) with a fix every second, until cleared.
+destination="platform=iOS Simulator,name=$device"
+result="${BIKR_RESULT_BUNDLE:-build/ui-test.xcresult}"
+rm -rf "$result"
+
+# Build first. A cold build takes minutes, and the simulated ride must still be
+# going when the test starts.
+xcodebuild build-for-testing -project Bikr.xcodeproj -scheme Bikr -destination "$destination" "$@"
+
+trap 'xcrun simctl location "$device" clear >/dev/null 2>&1 || true' EXIT
+# Ride at 8 m/s (about 29 km/h) with a fix every second.
 xcrun simctl location "$device" start --speed 8 --interval 1 \
   50.0614,19.9366 50.0640,19.9450 50.0680,19.9520 50.0720,19.9610 50.0760,19.9700 50.0800,19.9800
 
-trap 'xcrun simctl location "$device" clear >/dev/null 2>&1 || true' EXIT
-# Stop the simulated ride after the test's riding phase; leaving it running
-# has made xcodebuild hang during teardown.
-( sleep 90; xcrun simctl location "$device" clear >/dev/null 2>&1 || true ) &
-
-xcodebuild test -project Bikr.xcodeproj -scheme Bikr \
-  -destination "platform=iOS Simulator,name=$device" \
-  -only-testing:BikrUITests "$@"
+xcodebuild test-without-building -project Bikr.xcodeproj -scheme Bikr \
+  -destination "$destination" -only-testing:BikrUITests -resultBundlePath "$result" "$@"

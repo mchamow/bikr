@@ -28,13 +28,9 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v7
-      - name: Build the app
-        run: |
-          xcodebuild build -project Bikr.xcodeproj -scheme Bikr \
-            -destination 'generic/platform=iOS Simulator' \
-            -derivedDataPath build/DerivedData -quiet
+      # The script builds the app, then starts the simulated ride, then tests.
       - name: Record a ride and follow it
-        run: ./scripts/ui-test.sh "" -derivedDataPath build/DerivedData -resultBundlePath build/ui-test.xcresult
+        run: ./scripts/ui-test.sh "" -derivedDataPath build/DerivedData
       - name: Keep the test results when something fails
         if: failure()
         uses: actions/upload-artifact@v7
