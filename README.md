@@ -19,6 +19,7 @@ Bikr/
   Views/                 Ride screen, Tracks list, track detail
   Support/               Formatting, GPX sharing, CoreLocation bridges
 BikrUITests/             UI smoke test of the record → save → follow flow
+scripts/                 Test runners, and make-app-icon.swift which draws the icon
 Samples/                 A sample GPX route to import
 Packages/BikrCore/       Platform-independent logic, unit-tested
   Track, TrackStats      Model and ride statistics
