@@ -26,6 +26,14 @@ enum Fixtures {
         }
     }
 
+    /// A point `east` and `north` meters from `point`.
+    static func moved(from point: TrackPoint, east: Double = 0, north: Double = 0) -> TrackPoint {
+        TrackPoint(
+            latitude: point.latitude + north / metersPerDegree,
+            longitude: point.longitude + east / (metersPerDegree * cos(point.latitude * .pi / 180))
+        )
+    }
+
     /// A point `meters` east of `point`.
     static func east(of point: TrackPoint, by meters: Double) -> TrackPoint {
         TrackPoint(

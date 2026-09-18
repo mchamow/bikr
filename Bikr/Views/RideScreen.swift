@@ -274,7 +274,7 @@ private struct GuidanceBanner: View {
         if status.isFinished {
             return String(localized: "You've reached the end")
         }
-        return String(localized: "\(Format.distance(status.distanceRemaining)) to go · \(Format.distance(status.distanceDone)) done")
+        return String(localized: "\(Format.distance(status.distanceRemaining)) to go · \(Format.distance(status.distanceCovered)) done")
     }
 }
 
