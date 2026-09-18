@@ -31,6 +31,27 @@ struct LocationFilterTests {
         #expect(accepted([(points[0], 5), (jitter, 5), (points[1], 5)]) == [true, false, true])
     }
 
+    @Test func dropsDriftWhileStandingStill() {
+        // Fixes good to 10 m wandering 8 m about: that is the fix moving, not
+        // the bike.
+        let still = points[0]
+        let wanders = [8.0, -6, 7, -9].enumerated().map { index, offset in
+            (shifted(still, by: offset).with(timestamp: points[index + 1].timestamp), 10.0)
+        }
+        #expect(accepted([(still, 10.0)] + wanders) == [true, false, false, false, false])
+    }
+
+    @Test func acceptsMovementBiggerThanTheUncertainty() {
+        let moved = shifted(points[0], by: 14).with(timestamp: points[1].timestamp)
+        #expect(accepted([(points[0], 10), (moved, 10)]) == [true, true])
+    }
+
+    @Test func believesGPSWhenItReportsNoSpeed() {
+        var stopped = shifted(points[1], by: 30)
+        stopped.speed = 0.2
+        #expect(accepted([(points[0], 5), (stopped, 5)]) == [true, false])
+    }
+
     @Test func dropsASingleGlitch() {
         let result = accepted([(points[0], 5), (shifted(points[1], by: 500), 5), (points[2], 5)])
         #expect(result == [true, false, true])

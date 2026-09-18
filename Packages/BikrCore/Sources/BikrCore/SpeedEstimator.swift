@@ -6,6 +6,9 @@ import Foundation
 public struct SpeedEstimator: Sendable {
     /// Fixes closer together in time than this are too noisy to measure with.
     public var minimumInterval: TimeInterval = 1
+    /// Below this (m/s) the rider is standing still, and the display should say
+    /// so rather than show the GPS wandering about.
+    public var stationarySpeed = 0.7
 
     private var lastMeasured: TrackPoint?
     private var lastSpeed: Double?
@@ -20,8 +23,8 @@ public struct SpeedEstimator: Sendable {
     /// m/s, or nil until there is enough to go on.
     public mutating func speed(at point: TrackPoint) -> Double? {
         if let reported = point.speed {
-            lastSpeed = reported
-            return reported
+            lastSpeed = reported < stationarySpeed ? 0 : reported
+            return lastSpeed
         }
         guard let previous = lastMeasured, let start = previous.timestamp, let end = point.timestamp else {
             lastMeasured = point
@@ -30,7 +33,8 @@ public struct SpeedEstimator: Sendable {
         let elapsed = end.timeIntervalSince(start)
         guard elapsed >= minimumInterval else { return lastSpeed }
         lastMeasured = point
-        lastSpeed = previous.distance(to: point) / elapsed
+        let measured = previous.distance(to: point) / elapsed
+        lastSpeed = measured < stationarySpeed ? 0 : measured
         return lastSpeed
     }
 }

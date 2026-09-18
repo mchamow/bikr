@@ -11,6 +11,9 @@ final class LocationFeed {
         case unavailable
     }
 
+    /// Fixes older than this (s) are left over from before the ride.
+    private static let staleFix = 5.0
+
     private(set) var isRunning = false
     private(set) var problem: Problem?
 
@@ -75,6 +78,10 @@ final class LocationFeed {
             problem = .approximateOnly
         } else if let location = update.location {
             problem = nil
+            // CoreLocation often opens with a fix it had lying around, taken
+            // where the phone last was. Riding from there to here is distance
+            // nobody rode.
+            guard location.timestamp.timeIntervalSinceNow > -Self.staleFix else { return }
             onLocation(location)
         }
     }

@@ -36,6 +36,16 @@ struct SpeedEstimatorTests {
         #expect(estimator.speed(at: soon) == measured)
     }
 
+    @Test func readsZeroWhileStandingStill() {
+        // A metre of wander over two seconds is not riding.
+        var wander = points[0]
+        wander.latitude += 1 / Fixtures.metersPerDegree
+        wander.timestamp = points[1].timestamp
+        var estimator = SpeedEstimator()
+        _ = estimator.speed(at: points[0])
+        #expect(estimator.speed(at: wander) == 0)
+    }
+
     @Test func resetForgetsEverything() {
         var estimator = SpeedEstimator()
         for point in points { _ = estimator.speed(at: point) }
