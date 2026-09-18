@@ -33,11 +33,22 @@ final class AppModel {
     /// The way the rider is going, kept from the last fix that was moving so
     /// the map doesn't spin while they stand still.
     private(set) var heading: Double?
+    /// Whether the rider is actually going somewhere, which decides if the map
+    /// should take itself back to the navigation view.
+    private(set) var isMoving = false
+
+    /// How long a map stays where the rider put it before returning to the
+    /// navigation view. Shortened by UI tests, which can't wait half a minute.
+    static let returnToNavigation: TimeInterval = {
+        let shortened = UserDefaults.standard.double(forKey: "BikrReturnToNavigation")
+        return shortened > 0 ? shortened : 30
+    }()
     /// Location runs while the ride screen is open, so it can show where you are.
     var isRideScreenVisible = false { didSet { updateLocationNeeds() } }
 
     /// Only to read the authorization status; making one doesn't prompt.
     @ObservationIgnored private var headings = HeadingEstimator()
+    @ObservationIgnored private var speeds = SpeedEstimator()
     @ObservationIgnored private let authorization = CLLocationManager()
     @ObservationIgnored private let store: TrackStore
     @ObservationIgnored private let draft: RideDraft
@@ -230,10 +241,12 @@ final class AppModel {
     /// GPS reports a course when it is sure of one; otherwise the way the
     /// rider is going comes from where they have just been.
     private func updateHeading(from location: CLLocation) {
+        let point = TrackPoint(location)
         let reported = location.course >= 0 && location.courseAccuracy >= 0 && location.speed > 1
             ? location.course
             : nil
-        heading = headings.heading(at: TrackPoint(location), course: reported)
+        heading = headings.heading(at: point, course: reported)
+        isMoving = (speeds.speed(at: point) ?? 0) > 1
     }
 
     private func updateLocationNeeds() {

@@ -8,6 +8,8 @@ import SwiftUI
 struct RideScreen: View {
     @Environment(AppModel.self) private var model
     @State private var camera = MapCameraPosition.userLocation(fallback: .automatic)
+    /// When the rider last moved the map themselves.
+    @State private var tookOverMapAt: Date?
     @State private var isPickingTrack = false
     @State private var isConfirmingFinish = false
 
@@ -81,10 +83,18 @@ struct RideScreen: View {
     /// the screen on where they have already been.
     private static let lookAhead = 75.0
 
-    /// Keeps Apple's map under the rider, facing the way they are going —
-    /// unless they have taken hold of the map themselves.
+    /// Keeps Apple's map under the rider, facing the way they are going. Once
+    /// they take hold of it, it stays where they put it until they have left it
+    /// alone for a while and are riding on again.
     private func rideAlongWithTheRider() {
-        guard isRiding, !camera.positionedByUser, let fix = model.currentFix else { return }
+        guard isRiding, let fix = model.currentFix else { return }
+        if let tookOverMapAt {
+            guard model.isMoving,
+                  Date.now.timeIntervalSince(tookOverMapAt) >= AppModel.returnToNavigation else { return }
+            self.tookOverMapAt = nil
+        } else if camera.positionedByUser {
+            return
+        }
         let heading = model.heading ?? 0
         let ahead = TrackPoint(fix).moved(
             east: sin(heading * .pi / 180) * Self.lookAhead,
@@ -96,6 +106,21 @@ struct RideScreen: View {
                 distance: 500,
                 heading: heading,
                 pitch: 55
+            ))
+        }
+    }
+
+    /// Takes the tilt and the turn out of the map, keeping where the rider is
+    /// looking and how far out they have zoomed.
+    private func layFlat(_ context: MapCameraUpdateContext) {
+        let current = context.camera
+        guard current.pitch > 1 || current.heading != 0 else { return }
+        withAnimation(.easeOut(duration: 0.4)) {
+            camera = .camera(MapCamera(
+                centerCoordinate: current.centerCoordinate,
+                distance: current.distance,
+                heading: 0,
+                pitch: 0
             ))
         }
     }
@@ -117,6 +142,13 @@ struct RideScreen: View {
             MapCompass()
             MapScaleView()
         }
+        .onMapCameraChange(frequency: .onEnd) { context in
+            guard camera.positionedByUser else { return }
+            tookOverMapAt = .now
+            // Looking around is done on a flat, north-up map; the tilted view
+            // is for riding.
+            layFlat(context)
+        }
     }
 
     private var drawnMap: some View {
@@ -125,7 +157,8 @@ struct RideScreen: View {
             rider: canvasRider,
             wayBack: canvasWayBack,
             followsRider: true,
-            heading: isRiding ? model.heading : nil
+            heading: isRiding ? model.heading : nil,
+            isMoving: model.isMoving
         )
         .overlay {
             if canvasRider == nil && canvasLines.allSatisfy({ $0.segments.allSatisfy(\.isEmpty) }) {

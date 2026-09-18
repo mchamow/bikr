@@ -113,7 +113,7 @@ final class RideFlowUITests: XCTestCase {
     @MainActor
     func testRecordsWithoutAConnection() {
         let app = XCUIApplication()
-        app.launchArguments += ["-BikrForceOffline", "YES"]
+        app.launchArguments += ["-BikrForceOffline", "YES", "-BikrReturnToNavigation", "3"]
         app.launch()
 
         XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 10), "No offline notice shown")
@@ -127,12 +127,26 @@ final class RideFlowUITests: XCTestCase {
         app.swipeLeft()
         let centreOnMe = app.buttons["Centre on Me"]
         XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5), "Dragging the map didn't free it from the rider")
+
+        // Left alone, the map goes back to following the rider by itself.
+        XCTAssertTrue(waitForItToGo(centreOnMe, within: 20), "The map never went back to following the rider")
+
+        // And it can be brought back by hand, without waiting.
+        app.swipeLeft()
+        XCTAssertTrue(centreOnMe.waitForExistence(timeout: 5))
         centreOnMe.tap()
-        XCTAssertFalse(centreOnMe.waitForExistence(timeout: 3), "Still off-centre after centring")
+        XCTAssertTrue(waitForItToGo(centreOnMe, within: 5), "Still off-centre after centring")
 
         app.buttons["Finish"].tap()
         app.buttons["Discard Ride"].tap()
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 5))
+    }
+
+    /// Waits for something on screen to go away.
+    @MainActor
+    private func waitForItToGo(_ element: XCUIElement, within seconds: TimeInterval) -> Bool {
+        let gone = XCTNSPredicateExpectation(predicate: NSPredicate(format: "exists == false"), object: element)
+        return XCTWaiter.wait(for: [gone], timeout: seconds) == .completed
     }
 
     /// Starts recording and waits until the ride has covered some ground.

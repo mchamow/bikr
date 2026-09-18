@@ -207,6 +207,9 @@ struct InteractiveTrackCanvas: View {
     /// The bearing to put at the top of the screen while following the rider.
     /// Nil leaves north up.
     var heading: Double?
+    /// Whether the rider is going somewhere, which decides whether the map
+    /// takes itself back to the navigation view.
+    var isMoving = false
     /// How much to show around the rider before anyone zooms.
     var metersAcrossWhenFollowing = 500.0
 
@@ -216,6 +219,8 @@ struct InteractiveTrackCanvas: View {
     @State private var rotationWhileMovedByHand: Double?
     @State private var centreAtDragStart: TrackPoint?
     @State private var metersAcrossAtPinchStart: Double?
+    /// When the rider last moved the map themselves.
+    @State private var tookOverAt: Date?
 
     private var follows: Bool { isFollowingRider ?? followsRider }
 
@@ -248,6 +253,9 @@ struct InteractiveTrackCanvas: View {
             )
             .animation(.linear(duration: 0.9), value: rotation)
             .contentShape(.rect)
+            // Fixes arrive about once a second while riding, which is often
+            // enough to notice that the rider has left the map alone.
+            .onChange(of: rider?.position) { returnToTheRiderIfLeftAlone() }
             .gesture(drag(from: camera, in: proxy.size))
             .simultaneousGesture(pinch(from: camera))
             .overlay(alignment: .trailing) { controls(in: proxy.size) }
@@ -285,6 +293,7 @@ struct InteractiveTrackCanvas: View {
                     rotation: rotationWhileMovedByHand ?? 0
                 )
                 isFollowingRider = false
+                tookOverAt = .now
                 metersAcross = camera.metersAcross
                 panCentre = projection.coordinate(
                     movedBy: -Double(value.translation.width),
@@ -299,10 +308,32 @@ struct InteractiveTrackCanvas: View {
             .onChanged { value in
                 guard let camera else { return }
                 let base = metersAcrossAtPinchStart ?? camera.metersAcross
-                metersAcrossAtPinchStart = base
+                if metersAcrossAtPinchStart == nil {
+                    metersAcrossAtPinchStart = base
+                    // Zooming out is for looking around, which is done on a
+                    // north-up map that stays put.
+                    panCentre = camera.centre
+                    rotationWhileMovedByHand = 0
+                    isFollowingRider = false
+                }
+                tookOverAt = .now
                 metersAcross = min(max(base / value.magnification, 50), 50_000)
             }
             .onEnded { _ in metersAcrossAtPinchStart = nil }
+    }
+
+    /// Back to riding: the map returns to following the rider once they have
+    /// left it alone for a while and are going somewhere again.
+    private func returnToTheRiderIfLeftAlone() {
+        guard let tookOverAt, isMoving, rider != nil else { return }
+        guard Date.now.timeIntervalSince(tookOverAt) >= AppModel.returnToNavigation else { return }
+        withAnimation {
+            self.tookOverAt = nil
+            isFollowingRider = true
+            panCentre = nil
+            rotationWhileMovedByHand = nil
+            metersAcross = nil
+        }
     }
 
     @ViewBuilder
@@ -311,6 +342,7 @@ struct InteractiveTrackCanvas: View {
             if rider != nil, !follows {
                 Button("Centre on Me", systemImage: "location") {
                     withAnimation {
+                        tookOverAt = nil
                         isFollowingRider = true
                         panCentre = nil
                         rotationWhileMovedByHand = nil
@@ -322,6 +354,7 @@ struct InteractiveTrackCanvas: View {
                 Button("Show the Whole Track", systemImage: "arrow.up.left.and.arrow.down.right") {
                     guard let fitted = TrackCanvas.cameraFitting(everything, in: size) else { return }
                     withAnimation {
+                        tookOverAt = .now
                         isFollowingRider = false
                         rotationWhileMovedByHand = 0   // north up, to take it all in
                         panCentre = fitted.center
