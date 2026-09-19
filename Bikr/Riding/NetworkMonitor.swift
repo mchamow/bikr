@@ -12,8 +12,8 @@ final class NetworkMonitor {
 
     init() {
         // Lets the UI tests (and a curious rider) see the offline behaviour
-        // without turning on airplane mode: -BikrForceOffline YES
-        if UserDefaults.standard.bool(forKey: "BikrForceOffline") {
+        // without turning on airplane mode.
+        if TestSettings.forcesOffline {
             isOnline = false
             return
         }

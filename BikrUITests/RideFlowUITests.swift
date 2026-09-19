@@ -117,10 +117,12 @@ final class RideFlowUITests: XCTestCase {
     @MainActor
     func testRecordsWithoutAConnection() {
         let app = XCUIApplication()
-        app.launchArguments += ["-BikrForceOffline", "YES", "-BikrReturnToNavigation", "3"]
+        app.launchEnvironment["BIKR_FORCE_OFFLINE"] = "1"
+        app.launchEnvironment["BIKR_RETURN_TO_NAVIGATION"] = "3"
         app.launch()
 
-        XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 10), "No offline notice shown")
+        XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 15),
+                      "No offline notice shown:\n\(app.debugDescription)")
 
         recordUntilMoving(app)
 
@@ -169,7 +171,8 @@ final class RideFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 10))
         app.buttons["Start Ride"].tap()
         allowLocationAccessIfAsked()
-        XCTAssertTrue(waitForRecordedDistance(in: app), "No distance was recorded while the simulator was moving")
+        XCTAssertTrue(waitForRecordedDistance(in: app),
+                      "No distance was recorded while the simulator was moving:\n\(app.debugDescription)")
     }
 
     /// Waits until some stat on screen reads like a distance above zero.

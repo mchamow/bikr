@@ -39,10 +39,7 @@ final class AppModel {
 
     /// How long a map stays where the rider put it before returning to the
     /// navigation view. Shortened by UI tests, which can't wait half a minute.
-    static let returnToNavigation: TimeInterval = {
-        let shortened = UserDefaults.standard.double(forKey: "BikrReturnToNavigation")
-        return shortened > 0 ? shortened : 30
-    }()
+    static let returnToNavigation = TestSettings.returnToNavigation ?? 30
     /// Location runs while the ride screen is open, so it can show where you are.
     var isRideScreenVisible = false { didSet { updateLocationNeeds() } }
 
