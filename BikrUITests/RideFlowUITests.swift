@@ -57,6 +57,10 @@ final class RideFlowUITests: XCTestCase {
         follow.tap()
         XCTAssertTrue(app.buttons["Stop Following"].waitForExistence(timeout: 10), "Following didn't start")
 
+        // A track that was ridden brings its own ghost to race.
+        XCTAssertTrue(app.descendants(matching: .any)["ghostScore"].waitForExistence(timeout: 15),
+                      "No ghost on a track that was recorded:\n\(app.debugDescription)")
+
         app.buttons["Stop Following"].tap()
         XCTAssertTrue(app.buttons["Follow a Track"].waitForExistence(timeout: 5))
     }

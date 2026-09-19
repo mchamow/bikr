@@ -13,6 +13,8 @@ public struct FollowStatus: Equatable, Sendable {
     public var distanceFromTrack: Double
     /// Nearest point of the track, for drawing a way back when off track.
     public var closestPoint: TrackPoint
+    /// Where the rider is along the track, measured from its start.
+    public var alongTrack: Double
     /// Meters ridden along the track since joining it.
     public var distanceCovered: Double
     /// Meters to the far end of the track the way the rider is going — or back
@@ -102,6 +104,7 @@ public struct TrackFollower: Sendable {
         return FollowStatus(
             distanceFromTrack: match.distance,
             closestPoint: match.point,
+            alongTrack: match.along,
             distanceCovered: covered,
             distanceRemaining: remaining,
             direction: direction ?? .along,

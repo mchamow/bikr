@@ -44,6 +44,7 @@ struct RideScreen: View {
                         track: track,
                         status: guide.status,
                         bearingToTrack: bearingToTrack,
+                        ghost: guide.ghost,
                         strayedBy: model.strayedBy,
                         onStop: model.stopFollowing,
                         onBackToTrack: model.keepFollowingTheTrack,
@@ -135,6 +136,12 @@ struct RideScreen: View {
                     .stroke(.red, style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 8]))
             }
             TrackLines(segments: recorder.segments, color: .orange)
+            if let ghost = guide.ghost {
+                Annotation("Your ghost", coordinate: ghost.position.coordinate) {
+                    GhostMarker()
+                }
+                .annotationTitles(.hidden)
+            }
             UserAnnotation()
         }
         .mapControls {
@@ -156,6 +163,7 @@ struct RideScreen: View {
             lines: canvasLines,
             rider: canvasRider,
             wayBack: canvasWayBack,
+            ghost: guide.ghost?.position,
             followsRider: true,
             heading: isRiding ? model.heading : nil,
             isMoving: model.isMoving
@@ -278,6 +286,8 @@ private struct GuidanceBanner: View {
     let status: FollowStatus?
     /// Degrees from north towards the track, when off it.
     let bearingToTrack: Double?
+    /// The rider's earlier self on this track, when there is one to race.
+    let ghost: TrackGuide.Ghost?
     /// Set while Bikr is asking whether leaving the track was deliberate.
     let strayedBy: Double?
     let onStop: () -> Void
@@ -315,6 +325,10 @@ private struct GuidanceBanner: View {
                     .buttonBorderShape(.circle)
             }
 
+            if let ghost {
+                GhostScore(ghost: ghost)
+            }
+
             // Leaving the track is often deliberate, so ask rather than nag.
             if strayedBy != nil {
                 HStack(spacing: 10) {
@@ -342,6 +356,43 @@ private struct GuidanceBanner: View {
             return String(localized: "You've reached the end")
         }
         return String(localized: "\(Format.distance(status.distanceRemaining)) to go · \(Format.distance(status.distanceCovered)) done")
+    }
+}
+
+/// The rider's earlier self, on the map.
+private struct GhostMarker: View {
+    var body: some View {
+        Image(systemName: "bicycle")
+            .font(.caption.weight(.bold))
+            .foregroundStyle(.white)
+            .padding(6)
+            .background(.secondary.opacity(0.85), in: .circle)
+            .overlay(Circle().stroke(.white, lineWidth: 2))
+    }
+}
+
+/// How the race against that earlier self is going.
+private struct GhostScore: View {
+    let ghost: TrackGuide.Ghost
+
+    private var colour: Color {
+        if ghost.hasFinished { return .secondary }
+        return ghost.lead >= 0 ? .green : .orange
+    }
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "bicycle")
+            if ghost.hasFinished {
+                Text("Your ghost has finished")
+            } else {
+                Text("\(Format.gap(ghost.lead)) \(ghost.lead >= 0 ? "ahead of" : "behind") your ghost")
+            }
+        }
+        .font(.subheadline.weight(.medium))
+        .foregroundStyle(colour)
+        .monospacedDigit()
+        .accessibilityIdentifier("ghostScore")
     }
 }
 

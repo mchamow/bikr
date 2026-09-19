@@ -5,12 +5,23 @@ import Observation
 /// Guides the rider along a chosen track and warns when they leave it.
 @Observable
 final class TrackGuide {
+    /// The rider's earlier self on this track, and how the race is going.
+    struct Ghost {
+        var position: TrackPoint
+        /// Seconds the rider is ahead (positive) or behind (negative).
+        var lead: TimeInterval
+        var hasFinished: Bool
+    }
+
     private(set) var track: Track?
     private(set) var status: FollowStatus?
+    private(set) var ghost: Ghost?
     /// Where the rider was at the last update.
     private(set) var position: TrackPoint?
 
     @ObservationIgnored private var follower: TrackFollower?
+    @ObservationIgnored private var ghostRider: GhostRider?
+    @ObservationIgnored private var raceStartedAt: Date?
 
     /// Called when the rider leaves the track, comes back to it, or reaches the
     /// end. What to do about it is the app's decision, not the guide's.
@@ -34,6 +45,33 @@ final class TrackGuide {
         follower = nil
         status = nil
         position = nil
+        ghost = nil
+        ghostRider = nil
+        raceStartedAt = nil
+    }
+
+    /// Sets the rider's old self going from wherever they joined the track,
+    /// and keeps score. Turning round starts the race again from there.
+    private func race(_ status: FollowStatus, at now: Date) {
+        guard let track else { return }
+        if ghostRider == nil || ghostRider?.direction != status.direction {
+            ghostRider = GhostRider(
+                segments: track.segments,
+                joinedAtAlong: status.alongTrack,
+                direction: status.direction
+            )
+            raceStartedAt = now
+        }
+        guard let ghostRider, let raceStartedAt else {
+            ghost = nil
+            return
+        }
+        let elapsed = now.timeIntervalSince(raceStartedAt)
+        ghost = Ghost(
+            position: ghostRider.position(after: elapsed),
+            lead: ghostRider.lead(at: status.alongTrack, after: elapsed),
+            hasFinished: ghostRider.hasFinished(after: elapsed)
+        )
     }
 
     func update(_ location: CLLocation) {
@@ -45,6 +83,7 @@ final class TrackGuide {
         let old = status
         status = new
         position = here
+        race(new, at: location.timestamp)
 
         // Nothing to report on the first fix: the banner already says where
         // the rider is.

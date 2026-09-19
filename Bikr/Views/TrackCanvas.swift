@@ -29,6 +29,8 @@ struct TrackCanvas: View {
     var rider: Rider?
     /// Dashed line from the rider back to the nearest point of the track.
     var wayBack: (from: TrackPoint, to: TrackPoint)?
+    /// The rider's earlier self, racing them along the track.
+    var ghost: TrackPoint?
     /// The bearing that points up the screen; 0 leaves north up.
     var rotation: Double = 0
     /// Where the centre sits vertically, 0...1. Lower shows more of the way ahead.
@@ -55,6 +57,12 @@ struct TrackCanvas: View {
                 context.stroke(path, with: .color(.red), style: StrokeStyle(lineWidth: 3, lineCap: .round, dash: [6, 8]))
             }
 
+            if let ghost {
+                let at = projection.place(ghost)
+                let dot = CGRect(x: at.x - 8, y: at.y - 8, width: 16, height: 16)
+                context.fill(Path(ellipseIn: dot), with: .color(.secondary.opacity(0.7)))
+                context.stroke(Path(ellipseIn: dot), with: .color(.white), lineWidth: 2)
+            }
             if let rider {
                 draw(rider, in: &context, projection)
             }
@@ -202,6 +210,8 @@ struct InteractiveTrackCanvas: View {
     var lines: [TrackCanvas.Line]
     var rider: TrackCanvas.Rider?
     var wayBack: (from: TrackPoint, to: TrackPoint)?
+    /// The rider's earlier self, racing them along the track.
+    var ghost: TrackPoint?
     /// Keeps the rider in the middle until the map is moved by hand.
     var followsRider = false
     /// The bearing to put at the top of the screen while following the rider.
@@ -248,6 +258,7 @@ struct InteractiveTrackCanvas: View {
                 focus: camera.map { .center($0.centre, metersAcross: $0.metersAcross) } ?? .fit,
                 rider: rider,
                 wayBack: wayBack,
+                ghost: ghost,
                 rotation: rotation,
                 focusY: focusY
             )

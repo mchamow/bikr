@@ -20,6 +20,11 @@ enum Format {
         return value.formatted(.measurement(width: .abbreviated, usage: .asProvided, numberFormatStyle: .number.precision(.fractionLength(0))))
     }
 
+    /// A gap in a race: "0:12".
+    static func gap(_ seconds: TimeInterval) -> String {
+        Duration.seconds(abs(seconds).rounded()).formatted(.time(pattern: .minuteSecond))
+    }
+
     static func duration(_ seconds: TimeInterval) -> String {
         Duration.seconds(max(0, seconds.rounded(.down))).formatted(.time(pattern: .hourMinuteSecond))
     }
