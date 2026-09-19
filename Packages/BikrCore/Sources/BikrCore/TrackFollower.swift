@@ -46,6 +46,11 @@ public struct TrackFollower: Sendable {
     /// A bigger step along the track than this (m) is a match somewhere else
     /// entirely, not ground covered.
     static let jumpAlongTrack = 200.0
+    /// Two bits of track this close together (m) are the same ground seen
+    /// twice — where a route doubles back on itself — and the choice between
+    /// them has to be made some other way. Anything wider is simply further
+    /// away, and preferring it would leave the rider's progress lagging behind.
+    static let sameGround = 2.0
 
     public let points: [TrackPoint]
     /// Distance along the track at each point.
@@ -135,7 +140,7 @@ public struct TrackFollower: Sendable {
                 .filter { cumulative[$0 + 1] >= last.along - 600 && cumulative[$0] <= last.along + 600 }
                 .map { match(position, leg: $0) }
             if let best = window.min(by: { $0.distance < $1.distance }), best.distance <= offTrackDistance {
-                return preferred(among: window.filter { $0.distance <= best.distance + 10 }, near: last) ?? best
+                return preferred(among: window.filter { $0.distance <= best.distance + Self.sameGround }, near: last) ?? best
             }
         }
 
@@ -143,7 +148,7 @@ public struct TrackFollower: Sendable {
         // wherever they happen to meet it.
         let all = legs.map { match(position, leg: $0) }
         let nearest = all.min { $0.distance < $1.distance }!
-        return preferred(among: all.filter { $0.distance <= nearest.distance + 10 }, near: lastMatch) ?? nearest
+        return preferred(among: all.filter { $0.distance <= nearest.distance + Self.sameGround }, near: lastMatch) ?? nearest
     }
 
     /// Where a track doubles back on itself several legs are equally close.

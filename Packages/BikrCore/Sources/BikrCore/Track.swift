@@ -59,20 +59,33 @@ public struct Track: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     public var origin: TrackOrigin
     public var createdAt: Date
+    /// The route this was ridden on, when it is one run of many. A track that
+    /// stands on its own — the first recording of a route, or an imported one —
+    /// has none.
+    public var runOf: UUID?
     public var segments: [[TrackPoint]]
 
-    public init(id: UUID = UUID(), name: String, origin: TrackOrigin, createdAt: Date = .now, segments: [[TrackPoint]]) {
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        origin: TrackOrigin,
+        createdAt: Date = .now,
+        runOf: UUID? = nil,
+        segments: [[TrackPoint]]
+    ) {
         self.id = id
         self.name = name
         self.origin = origin
         self.createdAt = createdAt
+        self.runOf = runOf
         self.segments = segments.filter { !$0.isEmpty }
     }
 
     public var points: [TrackPoint] { segments.flatMap(\.self) }
 
     public var summary: TrackSummary {
-        TrackSummary(id: id, name: name, origin: origin, createdAt: createdAt, stats: TrackStats(segments: segments))
+        TrackSummary(id: id, name: name, origin: origin, createdAt: createdAt, runOf: runOf,
+                     stats: TrackStats(segments: segments))
     }
 }
 
@@ -82,6 +95,8 @@ public struct TrackSummary: Codable, Identifiable, Hashable, Sendable {
     public var name: String
     public var origin: TrackOrigin
     public var createdAt: Date
+    /// The route this is a run of, if it is one.
+    public var runOf: UUID?
     public var stats: TrackStats
 }
 

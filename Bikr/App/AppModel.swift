@@ -82,8 +82,15 @@ final class AppModel {
         reloadSummaries()
     }
 
-    var recordedTracks: [TrackSummary] { summaries.filter { $0.origin == .recorded } }
-    var importedTracks: [TrackSummary] { summaries.filter { $0.origin == .imported } }
+    /// The saved tracks as routes with their runs.
+    var library: TrackLibrary { TrackLibrary(summaries) }
+    /// Routes only: the runs ridden on them live inside the route, not beside it.
+    var recordedTracks: [TrackSummary] { library.routes.filter { $0.origin == .recorded } }
+    var importedTracks: [TrackSummary] { library.routes.filter { $0.origin == .imported } }
+
+    func runs(of route: UUID) -> [TrackSummary] { library.runs(of: route) }
+    func bestRun(of route: UUID) -> TrackSummary? { library.bestRun(of: route) }
+    func record(of route: UUID) -> (runs: Int, best: TimeInterval?) { library.record(of: route) }
 
     // MARK: Riding
 
@@ -118,7 +125,16 @@ final class AppModel {
             message = "Nothing to save: no GPS position was recorded during this ride."
             return
         }
-        let track = Track(name: Self.rideName(startedAt: startedAt), origin: .recorded, createdAt: startedAt, segments: segments)
+        // Riding a track you are following is another run of it, not a new
+        // track of its own.
+        let followed = guide.track
+        let track = Track(
+            name: followed?.name ?? Self.rideName(startedAt: startedAt),
+            origin: .recorded,
+            createdAt: startedAt,
+            runOf: followed.map { $0.runOf ?? $0.id },
+            segments: segments
+        )
         // The draft stays if saving fails, so the ride can be recovered later.
         if perform("save the ride", { try store.save(track) }) {
             draft.discard()
@@ -157,7 +173,15 @@ final class AppModel {
 
     func follow(trackID: UUID) {
         perform("open the track") {
-            guide.follow(try store.track(id: trackID))
+            let track = try store.track(id: trackID)
+            // Race the quickest run of this route, whichever of its runs was
+            // chosen to follow.
+            let route = track.runOf ?? track.id
+            var ghostRun = track
+            if let best = bestRun(of: route), best.id != track.id {
+                ghostRun = try store.track(id: best.id)
+            }
+            guide.follow(track, racing: ghostRun)
             tab = .ride
         }
         updateLocationNeeds()
@@ -201,8 +225,10 @@ final class AppModel {
         if let followed = guide.track?.id, trackIDs.contains(followed) {
             stopFollowing()
         }
+        // A run belongs to its route; deleting the route takes them with it.
+        let withTheirRuns = trackIDs + trackIDs.flatMap { runs(of: $0).map(\.id) }
         perform("delete the track") {
-            for id in trackIDs { try store.delete(id: id) }
+            for id in Set(withTheirRuns) { try store.delete(id: id) }
         }
     }
 

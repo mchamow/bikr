@@ -8,7 +8,8 @@ A super simple bike ride recorder and track follower for iPhone (iOS 26+).
 - **Live stats**: time, distance, current and average speed.
 - **Ride history**: distance, moving and total time, average and max speed, climb, and a map of each ride.
 - **GPX**: share any track as a `.gpx` file. Import GPX files from the Tracks tab, or open them in Bikr from Files, Mail or Safari.
-- **Race your ghost**: follow a ride you recorded and your earlier self rides it beside you, at the pace you rode it — a second dot on the map and the seconds you're up or down. It sets off from wherever you join the track, waits where you waited, and races either way round.
+- **Routes and their runs**: riding a track you're following saves a run of that track rather than a new one. The Tracks list keeps one entry per route, showing how often you've ridden it and your best time; open it to see every run, quickest marked.
+- **Race your ghost**: following a route puts your best run of it back on the road beside you, at the pace you rode it — a second dot on the map and the seconds you're up or down. It sets off from wherever you join the track, waits where you waited, and races either way round.
 - **Rides like a navigation app**: while you ride, the map turns to the way you're going and tilts ahead, with you sitting low on the screen so the road in front fills it. Pinch or drag and it drops to a flat, north-up map that stays where you put it — then takes itself back to the navigation view after half a minute, once you're riding on again.
 - **Works with no signal**: recording, stats, following a track and its warnings never touch the network. Without a connection Bikr draws your track, position, heading, a north arrow and a scale bar itself, and that drawing works like a map: drag to move, pinch to zoom, one button to centre on yourself and another to see the whole track. It stands in for Apple's map whenever the map can't be shown — there is nothing to switch on. Apple's map is shown on top of that whenever there's a connection to fetch it.
 - **Rides survive a crash**: the ride is written to disk as you go, so if iOS shuts Bikr down mid-ride, the next launch offers the ride back.
@@ -34,7 +35,8 @@ Packages/BikrCore/       Platform-independent logic, unit-tested
   RideDraft              The ride in progress, appended to disk point by point
   TrackFollower          Matches GPS positions to a track (progress, off-track)
   LocationFilter         Drops noisy GPS fixes
-  GhostRider             Replays an earlier ride's pace to race against
+  GhostRider             Replays an earlier run's pace to race against
+  TrackLibrary           Routes, the runs ridden on them, and the time to beat
 ```
 
 ## Running

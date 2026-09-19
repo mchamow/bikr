@@ -20,6 +20,7 @@ final class TrackGuide {
     private(set) var position: TrackPoint?
 
     @ObservationIgnored private var follower: TrackFollower?
+    @ObservationIgnored private var ghostRun: Track?
     @ObservationIgnored private var ghostRider: GhostRider?
     @ObservationIgnored private var raceStartedAt: Date?
 
@@ -31,9 +32,12 @@ final class TrackGuide {
 
     var isActive: Bool { track != nil }
 
-    func follow(_ track: Track) {
+    /// - Parameter ghostRun: the earlier ride to race along this track. The
+    ///   track's own recording when there is nothing quicker.
+    func follow(_ track: Track, racing ghostRun: Track? = nil) {
         guard let follower = TrackFollower(segments: track.segments) else { return }
         self.track = track
+        self.ghostRun = ghostRun ?? track
         self.follower = follower
         status = nil
         position = nil
@@ -46,6 +50,7 @@ final class TrackGuide {
         status = nil
         position = nil
         ghost = nil
+        ghostRun = nil
         ghostRider = nil
         raceStartedAt = nil
     }
@@ -53,10 +58,11 @@ final class TrackGuide {
     /// Sets the rider's old self going from wherever they joined the track,
     /// and keeps score. Turning round starts the race again from there.
     private func race(_ status: FollowStatus, at now: Date) {
-        guard let track else { return }
+        guard let track, let ghostRun else { return }
         if ghostRider == nil || ghostRider?.direction != status.direction {
             ghostRider = GhostRider(
-                segments: track.segments,
+                run: ghostRun.segments,
+                on: track.segments,
                 joinedAtAlong: status.alongTrack,
                 direction: status.direction
             )

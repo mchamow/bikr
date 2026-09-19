@@ -46,7 +46,9 @@ final class RideFlowUITests: XCTestCase {
         // The ride is saved, with the distance it covered...
         app.tabBars.buttons["Tracks"].tap()
         // Rows are buttons; section headers are not.
-        let ride = app.collectionViews.buttons.element(boundBy: 0)
+        let tracks = app.collectionViews.buttons
+        let tracksBefore = tracks.count
+        let ride = tracks.element(boundBy: 0)
         XCTAssertTrue(ride.waitForExistence(timeout: 10), "The saved ride is missing from the Tracks tab:\n\(app.debugDescription)")
         XCTAssertTrue(hasPositiveDistance(ride.label), "The ride was saved without distance: \(ride.label)")
 
@@ -61,6 +63,29 @@ final class RideFlowUITests: XCTestCase {
         XCTAssertTrue(app.descendants(matching: .any)["ghostScore"].waitForExistence(timeout: 15),
                       "No ghost on a track that was recorded:\n\(app.debugDescription)")
 
+        // Riding a track you are following is another run of that track, not a
+        // new track sitting beside it.
+        app.buttons["Start Ride"].tap()
+        XCTAssertTrue(waitForRecordedDistance(in: app), "The second ride recorded nothing")
+        app.buttons["Finish"].tap()
+        app.buttons["Save Ride"].tap()
+
+        // The Tracks tab comes back where it was — the route's own screen,
+        // which now lists what has been ridden on it.
+        app.tabBars.buttons["Tracks"].tap()
+        XCTAssertTrue(app.staticTexts["Runs"].waitForExistence(timeout: 10),
+                      "The route doesn't list its runs:\n\(app.debugDescription)")
+
+        // And the run hasn't turned up as a track of its own.
+        app.navigationBars.buttons.firstMatch.tap()
+        XCTAssertTrue(tracks.element(boundBy: 0).waitForExistence(timeout: 5),
+                      "The track list is empty:\n\(app.debugDescription)")
+        XCTAssertEqual(tracks.count, tracksBefore,
+                       "The run should live inside the route, not beside it:\n\(app.debugDescription)")
+        let route = tracks.element(boundBy: 0).label
+        XCTAssertTrue(route.contains("run"), "The route doesn't show the runs ridden on it: \(route)")
+
+        app.tabBars.buttons["Ride"].tap()
         app.buttons["Stop Following"].tap()
         XCTAssertTrue(app.buttons["Follow a Track"].waitForExistence(timeout: 5))
     }
@@ -120,6 +145,7 @@ final class RideFlowUITests: XCTestCase {
         app.launchEnvironment["BIKR_FORCE_OFFLINE"] = "1"
         app.launchEnvironment["BIKR_RETURN_TO_NAVIGATION"] = "3"
         app.launch()
+        putAsideAnyUnfinishedRide(app)
 
         XCTAssertTrue(app.descendants(matching: .any)["offlineBanner"].waitForExistence(timeout: 15),
                       "No offline notice shown:\n\(app.debugDescription)")
@@ -149,6 +175,16 @@ final class RideFlowUITests: XCTestCase {
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 5))
     }
 
+    /// A test that ends mid-ride leaves a ride to recover, and its prompt would
+    /// block the next test's taps.
+    @MainActor
+    private func putAsideAnyUnfinishedRide(_ app: XCUIApplication) {
+        let discard = app.buttons["Discard"]
+        if discard.waitForExistence(timeout: 2) {
+            discard.tap()
+        }
+    }
+
     /// A deliberate drag across the map. A flick is too quick to be taken for
     /// a drag on a busy machine.
     @MainActor
@@ -168,6 +204,7 @@ final class RideFlowUITests: XCTestCase {
     /// Starts recording and waits until the ride has covered some ground.
     @MainActor
     private func recordUntilMoving(_ app: XCUIApplication) {
+        putAsideAnyUnfinishedRide(app)
         XCTAssertTrue(app.buttons["Start Ride"].waitForExistence(timeout: 10))
         app.buttons["Start Ride"].tap()
         allowLocationAccessIfAsked()

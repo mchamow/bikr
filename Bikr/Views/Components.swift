@@ -52,6 +52,8 @@ struct TrackStatsGrid: View {
 
 struct TrackRow: View {
     let summary: TrackSummary
+    /// How often this route has been ridden, and the time to beat.
+    var record: (runs: Int, best: TimeInterval?)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -68,6 +70,20 @@ struct TrackRow: View {
             }
             .font(.subheadline)
             .foregroundStyle(.secondary)
+
+            if let record, record.runs > 0 {
+                HStack(spacing: 6) {
+                    Image(systemName: "bicycle")
+                    Text("^[\(record.runs) run](inflect: true)")
+                    if let best = record.best {
+                        Text("·")
+                        Text("best \(Format.duration(best))")
+                    }
+                }
+                .font(.subheadline.weight(.medium))
+                .foregroundStyle(.tint)
+                .monospacedDigit()
+            }
         }
     }
 }

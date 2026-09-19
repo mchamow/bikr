@@ -16,7 +16,7 @@ struct TracksScreen: View {
                     onDelete: model.delete(trackIDs:)
                 ) { summary in
                     NavigationLink(value: summary.id) {
-                        TrackRow(summary: summary)
+                        TrackRow(summary: summary, record: model.record(of: summary.id))
                     }
                 }
             }

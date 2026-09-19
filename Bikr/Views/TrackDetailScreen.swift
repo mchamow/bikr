@@ -79,8 +79,12 @@ struct TrackDetailScreen: View {
                     }
                     .buttonStyle(.glassProminent)
                     .controlSize(.large)
+
+                    RunsList(runs: model.runs(of: trackID), best: model.bestRun(of: trackID)?.id)
                 }
                 .padding()
+                // Room for the last run to clear the tab bar.
+                .padding(.bottom, 60)
             }
         } else if let loadError {
             ContentUnavailableView("Can't Open Track", systemImage: "exclamationmark.triangle", description: Text(loadError))
@@ -91,6 +95,39 @@ struct TrackDetailScreen: View {
 }
 
 /// Apple's map when there is a connection, the drawn track when there isn't.
+/// Every time this route has been ridden, quickest first to beat marked.
+private struct RunsList: View {
+    let runs: [TrackSummary]
+    let best: UUID?
+
+    var body: some View {
+        if !runs.isEmpty {
+            VStack(alignment: .leading, spacing: 12) {
+                Text("Runs")
+                    .font(.headline)
+                ForEach(runs) { run in
+                    NavigationLink(value: run.id) {
+                        HStack(spacing: 10) {
+                            if run.id == best {
+                                Image(systemName: "star.fill").foregroundStyle(.yellow)
+                            }
+                            Text(run.createdAt, format: .dateTime.day().month())
+                            Spacer()
+                            Text(Format.duration(run.stats.movingTime))
+                            Text(Format.speed(run.stats.averageSpeed))
+                                .foregroundStyle(.secondary)
+                        }
+                        .monospacedDigit()
+                    }
+                    .tint(.primary)
+                    Divider()
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
 private struct TrackPreview: View {
     let track: Track
     let showsAppleMap: Bool
